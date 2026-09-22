@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🐱 Cat Snake</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="game-wrapper">
+    <div class="game-panel">
+      <h1>🐱 Cat Snake</h1>
+
+      <div class="hud">
+        <div class="hud-item">
+          <span class="label">Очки</span>
+          <span id="score">0</span>
+        </div>
+        <div class="hud-item">
+          <span class="label">Рекорд</span>
+          <span id="best">0</span>
+        </div>
+        <div class="hud-item">
+          <span class="label">Длина</span>
+          <span id="length">3</span>
+        </div>
+        <div class="hud-item">
+          <span class="label">Уровень</span>
+          <span id="level">1</span>
+        </div>
+      </div>
+
+      <div class="legend">
+        <div class="legend-item">
+          <span class="legend-icon">🐭</span>
+          <span>+1 очко</span>
+        </div>
+        <div class="legend-item">
+          <span class="legend-icon">🐟</span>
+          <span>+3 очка</span>
+        </div>
+      </div>
+
+      <div class="controls-hint">
+        <p>← ↑ ↓ → или WASD</p>
+        <p>Space — пауза</p>
+      </div>
+    </div>
+
+    <div class="board-wrapper">
+      <canvas id="game" width="480" height="480"></canvas>
+      <div id="overlay" class="overlay">
+        <div class="overlay-content">
+          <h2 id="overlay-title">🐾 Cat Snake</h2>
+          <p id="overlay-text">Накорми котиков мышками!</p>
+          <button id="start-btn">Играть</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="game.js"></script>
+</body>
+</html>
