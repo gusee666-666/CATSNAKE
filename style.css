@@ -112,6 +112,7 @@ h1 {
               inset 0 0 40px rgba(0, 0, 0, 0.5);
   max-width: 100%;
   height: auto;
+  /* размер управляется из JS через inline-стили на мобильном */
 }
 
 .overlay {
@@ -179,7 +180,15 @@ h1 {
   transform: scale(0.96);
 }
 
-/* ===== Мобильная версия ===== */
+/* =====================  ZOOM UI  ===================== */
+
+/* По умолчанию (ПК) кнопки зума скрыты */
+.zoom-controls,
+.zoom-indicator {
+  display: none;
+}
+
+/* =====================  Мобильная версия  ===================== */
 @media (max-width: 720px) {
   body {
     padding: 10px;
@@ -237,8 +246,89 @@ h1 {
   .hint-desktop { display: none; }
   .hint-mobile { display: block; }
 
+  /* Размер канваса задаётся из JS — здесь только фолбэк до инициализации */
   #game {
-    width: min(92vw, 92vh, 480px);
-    height: min(92vw, 92vh, 480px);
+    width: min(70vw, 70vh, 340px);
+    height: min(70vw, 70vh, 340px);
+  }
+
+  /* --- Кнопки зума --- */
+  .zoom-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    position: fixed;
+    right: 14px;
+    bottom: 14px;
+    z-index: 20;
+    pointer-events: auto;
+  }
+
+  .zoom-btn {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 183, 224, 0.5);
+    background: rgba(43, 30, 58, 0.85);
+    color: #ffd6f0;
+    font-size: 24px;
+    font-weight: 700;
+    line-height: 1;
+    cursor: pointer;
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.12s, background 0.15s, box-shadow 0.15s;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+    padding: 0;
+  }
+
+  .zoom-btn:active {
+    transform: scale(0.9);
+    background: rgba(255, 143, 200, 0.35);
+    box-shadow: 0 0 20px rgba(255, 143, 200, 0.55);
+  }
+
+  .zoom-btn:disabled {
+    opacity: 0.4;
+    cursor: default;
+    transform: none;
+    background: rgba(43, 30, 58, 0.6);
+  }
+
+  .zoom-reset {
+    font-size: 18px;
+  }
+
+  /* --- Индикатор --- */
+  .zoom-indicator {
+    display: block;
+    position: fixed;
+    right: 74px;
+    bottom: 26px;
+    padding: 6px 14px;
+    background: rgba(43, 30, 58, 0.92);
+    color: #ffd6f0;
+    border: 1px solid rgba(255, 183, 224, 0.4);
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s ease;
+    z-index: 20;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+  }
+
+  .zoom-indicator.show {
+    opacity: 1;
   }
 }

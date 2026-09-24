@@ -1,9 +1,9 @@
 // =====================================================================
-// 🐱 Cat Snake — Эрмитаж  |  Step 1: стабильная база
+// 🐱 Cat Snake — Эрмитаж  |  Step 2: + зум для смартфонов
 // =====================================================================
 
 // ---------------------------------------------------------------------
-// CONFIG — все настройки в одном месте
+// CONFIG
 // ---------------------------------------------------------------------
 const CONFIG = {
   // Поле
@@ -11,29 +11,39 @@ const CONFIG = {
   GRID: 20,
 
   // Скорость
-  STEP_START: 160,        // мс на шаг в начале
-  STEP_MIN: 70,           // минимальный интервал (максимальная скорость)
-  STEP_STEP: 10,          // ускорение за уровень
-  FOOD_PER_LEVEL: 5,      // сколько мышей до уровня
+  STEP_START: 160,
+  STEP_MIN: 70,
+  STEP_STEP: 10,
+  FOOD_PER_LEVEL: 5,
 
   // Еда
-  FISH_EVERY: 5,          // каждая N-я еда — рыбка
+  FISH_EVERY: 5,
   POINTS_MOUSE: 1,
   POINTS_FISH: 3,
+  FISH_CHANCE: 0.15,
 
   // Управление свайпами
   SWIPE_THRESHOLD: 24,
   TAP_MAX_MOVE: 14,
   TAP_MAX_TIME: 280,
 
-  // Еда: шанс появления рыбки вместо мышки на каждом спавне
-  FISH_CHANCE: 0.15,
-
   // Хранилище
   LS_BEST: 'catSnakeBest',
+  LS_ZOOM: 'catSnakeZoom',
+
+  // Зум
+  ZOOM_MIN: 0.6,
+  ZOOM_MAX: 1.4,
+  ZOOM_STEP: 0.15,
+  ZOOM_DEFAULT: 1.0,
+  ZOOM_BASE_FACTOR: 0.7,   // базовый размер = 70% доступного
+  ZOOM_MOBILE_BP: 720,     // ширина, ниже которой включается мобильный режим
+  ZOOM_DESKTOP_SIZE: 480,  // фикс. размер канваса на ПК
+  ZOOM_SAFE_TOP: 160,      // запас под HUD сверху
+  ZOOM_SAFE_SIDE: 20,      // запас по бокам
 };
 
-// Размер поля в пикселях
+// Размер поля в пикселях (логический, для отрисовки)
 const W = CONFIG.CELL * CONFIG.GRID;
 
 // ---------------------------------------------------------------------
@@ -51,8 +61,14 @@ const overlayTitle  = document.getElementById('overlay-title');
 const overlayText   = document.getElementById('overlay-text');
 const startBtn      = document.getElementById('start-btn');
 
+// Зум UI
+const zoomInBtn     = document.getElementById('zoom-in');
+const zoomOutBtn    = document.getElementById('zoom-out');
+const zoomResetBtn  = document.getElementById('zoom-reset');
+const zoomIndicator = document.getElementById('zoom-indicator');
+
 // ---------------------------------------------------------------------
-// STATE — всё изменяемое состояние
+// STATE
 // ---------------------------------------------------------------------
 const state = {
   snake: [],
@@ -70,16 +86,14 @@ const state = {
   isPaused: false,
   animId: null,
   eatFlash: 0,
+  zoom: 1.0, // инициализируется ниже
 };
 
 // ---------------------------------------------------------------------
 // RENDER — рисование
 // ---------------------------------------------------------------------
-
-// Утилита масштабирования (дизайн в 32px)
 const S = (size) => size / 32;
 
-// --- Кот ---
 function drawCatFace(ctx, px, py, size, opts) {
   const { color, face, pupilDX = 0, pupilDY = 0, closed = false } = opts;
   const s = S(size);
@@ -189,7 +203,6 @@ function drawCatFace(ctx, px, py, size, opts) {
   ctx.stroke();
 }
 
-// --- Мышка ---
 function drawMouse(ctx, px, py, size) {
   const s = S(size);
   const X = (v) => px + v * s;
@@ -238,7 +251,6 @@ function drawMouse(ctx, px, py, size) {
   ctx.fill();
 }
 
-// --- Золотая рыбка ---
 function drawFish(ctx, px, py, size) {
   const s = S(size);
   const X = (v) => px + v * s;
@@ -286,7 +298,6 @@ function drawFish(ctx, px, py, size) {
   ctx.stroke();
 }
 
-// --- Сетка и поле ---
 function drawGrid() {
   ctx.fillStyle = '#1a1024';
   ctx.fillRect(0, 0, W, W);
@@ -305,11 +316,9 @@ function drawGrid() {
   }
 }
 
-// --- Главный draw ---
 function draw() {
   drawGrid();
 
-  // Еда (пульсация)
   if (state.food) {
     const { CELL } = CONFIG;
     const px = state.food.x * CELL;
@@ -326,7 +335,6 @@ function draw() {
     ctx.restore();
   }
 
-  // Змейка (от хвоста к голове)
   for (let i = state.snake.length - 1; i >= 0; i--) {
     const seg = state.snake[i];
     const px = seg.x * CONFIG.CELL;
@@ -351,7 +359,6 @@ function draw() {
     }
   }
 
-  // Вспышка при поедании
   if (state.eatFlash > 0) {
     ctx.fillStyle = `rgba(255, 200, 240, ${state.eatFlash * 0.4})`;
     ctx.fillRect(0, 0, W, W);
@@ -359,7 +366,7 @@ function draw() {
 }
 
 // ---------------------------------------------------------------------
-// LOGIC — игровая логика
+// LOGIC
 // ---------------------------------------------------------------------
 function spawnFood() {
   const occupied = new Set(state.snake.map(s => s.x + ',' + s.y));
@@ -373,7 +380,6 @@ function spawnFood() {
 
   const spot = free[Math.floor(Math.random() * free.length)];
 
-  // Рыбка: либо каждые N мышей, либо случайный шанс
   const forcedFish = state.foodCount > 0 && state.foodCount % CONFIG.FISH_EVERY === 0;
   const randomFish = Math.random() < CONFIG.FISH_CHANCE;
   const type = (forcedFish || randomFish) ? 'fish' : 'mouse';
@@ -420,13 +426,11 @@ function tick() {
     y: state.snake[0].y + state.direction.y,
   };
 
-  // Стена
   if (head.x < 0 || head.x >= CONFIG.GRID || head.y < 0 || head.y >= CONFIG.GRID) {
     gameOver();
     return;
   }
 
-  // Столкновение с собой (хвост не считается, если не растём)
   const growing = state.food && head.x === state.food.x && head.y === state.food.y;
   const checkLen = growing ? state.snake.length : state.snake.length - 1;
   for (let i = 0; i < checkLen; i++) {
@@ -442,7 +446,7 @@ function tick() {
 }
 
 // ---------------------------------------------------------------------
-// LOOP — игровой цикл
+// LOOP
 // ---------------------------------------------------------------------
 function loop(time = 0) {
   if (!state.isRunning) return;
@@ -551,8 +555,6 @@ let touchStart = null;
 
 function onTouchStart(e) {
   if (e.touches.length !== 1) return;
-
-  // Тапы по кнопкам — не перехватываем
   if (e.target.closest('button, a')) return;
 
   const t = e.touches[0];
@@ -590,7 +592,6 @@ function onTouchEnd(e) {
   const dy = touch ? touch.clientY - touchStart.y : 0;
   const moved = Math.max(Math.abs(dx), Math.abs(dy));
 
-  // Короткий тап — пауза
   if (!touchStart.handled && moved < CONFIG.TAP_MAX_MOVE && duration < CONFIG.TAP_MAX_TIME) {
     if (state.isRunning) togglePause();
   }
@@ -616,6 +617,106 @@ document.addEventListener('touchmove', (e) => {
 boardWrapper.addEventListener('contextmenu', (e) => e.preventDefault());
 
 // ---------------------------------------------------------------------
+// ZOOM — управление масштабом для смартфонов
+// ---------------------------------------------------------------------
+
+// Доступное пространство под канвас
+function getAvailableSize() {
+  // На ПК — фиксированный
+  if (window.innerWidth > CONFIG.ZOOM_MOBILE_BP) {
+    return CONFIG.ZOOM_DESKTOP_SIZE;
+  }
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  const maxW = vw - CONFIG.ZOOM_SAFE_SIDE;
+  const maxH = vh - CONFIG.ZOOM_SAFE_TOP;
+  return Math.max(200, Math.min(maxW, maxH, CONFIG.ZOOM_DESKTOP_SIZE));
+}
+
+// Применить текущий zoom к канвасу
+function applyZoom() {
+  if (window.innerWidth > CONFIG.ZOOM_MOBILE_BP) {
+    // На ПК — убираем inline-стили, размер из CSS = 480×480
+    canvas.style.width = '';
+    canvas.style.height = '';
+    return;
+  }
+
+  const avail = getAvailableSize();
+  const size = Math.round(avail * CONFIG.ZOOM_BASE_FACTOR * state.zoom);
+  canvas.style.width = size + 'px';
+  canvas.style.height = size + 'px';
+}
+
+// Индикатор «100%» показывается на 1.2 сек
+let zoomIndicatorTimer = null;
+function showZoomIndicator() {
+  if (!zoomIndicator) return;
+  zoomIndicator.textContent = Math.round(state.zoom * 100) + '%';
+  zoomIndicator.classList.add('show');
+  clearTimeout(zoomIndicatorTimer);
+  zoomIndicatorTimer = setTimeout(() => {
+    zoomIndicator.classList.remove('show');
+  }, 1200);
+}
+
+// Обновить состояние кнопок (disable на краях диапазона)
+function updateZoomButtons() {
+  if (zoomInBtn)  zoomInBtn.disabled  = state.zoom >= CONFIG.ZOOM_MAX - 1e-6;
+  if (zoomOutBtn) zoomOutBtn.disabled = state.zoom <= CONFIG.ZOOM_MIN + 1e-6;
+  if (zoomResetBtn) zoomResetBtn.disabled = Math.abs(state.zoom - CONFIG.ZOOM_DEFAULT) < 1e-6;
+}
+
+// Установить зум (с клампом и сохранением)
+function setZoom(value, showIndicator = true) {
+  const clamped = Math.max(CONFIG.ZOOM_MIN, Math.min(CONFIG.ZOOM_MAX, value));
+  const rounded = Math.round(clamped * 100) / 100;
+
+  if (rounded === state.zoom) return;
+
+  state.zoom = rounded;
+  try { localStorage.setItem(CONFIG.LS_ZOOM, String(state.zoom)); } catch (e) {}
+
+  applyZoom();
+  updateZoomButtons();
+  if (showIndicator) showZoomIndicator();
+}
+
+function zoomIn()  { setZoom(state.zoom + CONFIG.ZOOM_STEP); }
+function zoomOut() { setZoom(state.zoom - CONFIG.ZOOM_STEP); }
+function zoomReset() { setZoom(CONFIG.ZOOM_DEFAULT); }
+
+// Навесить обработчики на кнопки зума
+function initZoomControls() {
+  const bind = (btn, handler) => {
+    if (!btn) return;
+    const fire = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      handler();
+    };
+    btn.addEventListener('click', fire);
+    btn.addEventListener('touchend', fire, { passive: false });
+    // защита от двойного вызова click + touchend
+    let lastFire = 0;
+    btn.addEventListener('pointerdown', (e) => {
+      const now = performance.now();
+      if (now - lastFire < 250) { e.preventDefault(); return; }
+      lastFire = now;
+    });
+  };
+  bind(zoomInBtn, zoomIn);
+  bind(zoomOutBtn, zoomOut);
+  bind(zoomResetBtn, zoomReset);
+}
+
+// Реагируем на изменение размера окна / поворот экрана
+window.addEventListener('resize', () => { applyZoom(); });
+window.addEventListener('orientationchange', () => {
+  setTimeout(applyZoom, 100);
+});
+
+// ---------------------------------------------------------------------
 // BUTTONS
 // ---------------------------------------------------------------------
 function handleStartBtn(e) {
@@ -631,5 +732,19 @@ startBtn.addEventListener('touchend', handleStartBtn, { passive: false });
 // ---------------------------------------------------------------------
 // INIT
 // ---------------------------------------------------------------------
-bestEl.textContent = state.best;
-drawGrid();
+(function init() {
+  // Загружаем сохранённый зум
+  const saved = parseFloat(localStorage.getItem(CONFIG.LS_ZOOM));
+  if (Number.isFinite(saved)) {
+    state.zoom = Math.max(CONFIG.ZOOM_MIN, Math.min(CONFIG.ZOOM_MAX, saved));
+  } else {
+    state.zoom = CONFIG.ZOOM_DEFAULT;
+  }
+
+  bestEl.textContent = state.best;
+  drawGrid();
+
+  applyZoom();
+  updateZoomButtons();
+  initZoomControls();
+})();
