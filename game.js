@@ -1,46 +1,85 @@
-// ========================
-// 🐱 Cat Snake — со свайпами
-// ========================
+// =====================================================================
+// 🐱 Cat Snake — Эрмитаж  |  Step 1: стабильная база
+// =====================================================================
 
-const CELL = 24;
-const GRID = 20;
-const W = CELL * GRID;
+// ---------------------------------------------------------------------
+// CONFIG — все настройки в одном месте
+// ---------------------------------------------------------------------
+const CONFIG = {
+  // Поле
+  CELL: 24,
+  GRID: 20,
 
-const canvas = document.getElementById('game');
-const ctx = canvas.getContext('2d');
-const boardWrapper = document.getElementById('board-wrapper');
+  // Скорость
+  STEP_START: 160,        // мс на шаг в начале
+  STEP_MIN: 70,           // минимальный интервал (максимальная скорость)
+  STEP_STEP: 10,          // ускорение за уровень
+  FOOD_PER_LEVEL: 5,      // сколько мышей до уровня
 
-const scoreEl = document.getElementById('score');
-const bestEl = document.getElementById('best');
-const lengthEl = document.getElementById('length');
-const levelEl = document.getElementById('level');
-const overlay = document.getElementById('overlay');
-const overlayTitle = document.getElementById('overlay-title');
-const overlayText = document.getElementById('overlay-text');
-const startBtn = document.getElementById('start-btn');
+  // Еда
+  FISH_EVERY: 5,          // каждая N-я еда — рыбка
+  POINTS_MOUSE: 1,
+  POINTS_FISH: 3,
 
-// Состояние
-let snake = [];
-let direction = { x: 1, y: 0 };
-let nextDirection = { x: 1, y: 0 };
-let food = null;
-let score = 0;
-let best = +(localStorage.getItem('catSnakeBest') || 0);
-let foodCount = 0;
-let level = 1;
-let stepInterval = 160;
-let stepCounter = 0;
-let lastTime = 0;
-let isRunning = false;
-let isPaused = false;
-let animId = null;
-let eatFlash = 0;
+  // Управление свайпами
+  SWIPE_THRESHOLD: 24,
+  TAP_MAX_MOVE: 14,
+  TAP_MAX_TIME: 280,
 
-// ========================
-// 🎨 Хелперы рисования
-// ========================
+  // Еда: шанс появления рыбки вместо мышки на каждом спавне
+  FISH_CHANCE: 0.15,
+
+  // Хранилище
+  LS_BEST: 'catSnakeBest',
+};
+
+// Размер поля в пикселях
+const W = CONFIG.CELL * CONFIG.GRID;
+
+// ---------------------------------------------------------------------
+// DOM
+// ---------------------------------------------------------------------
+const canvas        = document.getElementById('game');
+const ctx           = canvas.getContext('2d');
+const boardWrapper  = document.getElementById('board-wrapper');
+const scoreEl       = document.getElementById('score');
+const bestEl        = document.getElementById('best');
+const lengthEl      = document.getElementById('length');
+const levelEl       = document.getElementById('level');
+const overlay       = document.getElementById('overlay');
+const overlayTitle  = document.getElementById('overlay-title');
+const overlayText   = document.getElementById('overlay-text');
+const startBtn      = document.getElementById('start-btn');
+
+// ---------------------------------------------------------------------
+// STATE — всё изменяемое состояние
+// ---------------------------------------------------------------------
+const state = {
+  snake: [],
+  direction: { x: 1, y: 0 },
+  nextDirection: { x: 1, y: 0 },
+  food: null,
+  score: 0,
+  best: +(localStorage.getItem(CONFIG.LS_BEST) || 0),
+  foodCount: 0,
+  level: 1,
+  stepInterval: CONFIG.STEP_START,
+  stepCounter: 0,
+  lastTime: 0,
+  isRunning: false,
+  isPaused: false,
+  animId: null,
+  eatFlash: 0,
+};
+
+// ---------------------------------------------------------------------
+// RENDER — рисование
+// ---------------------------------------------------------------------
+
+// Утилита масштабирования (дизайн в 32px)
 const S = (size) => size / 32;
 
+// --- Кот ---
 function drawCatFace(ctx, px, py, size, opts) {
   const { color, face, pupilDX = 0, pupilDY = 0, closed = false } = opts;
   const s = S(size);
@@ -150,6 +189,7 @@ function drawCatFace(ctx, px, py, size, opts) {
   ctx.stroke();
 }
 
+// --- Мышка ---
 function drawMouse(ctx, px, py, size) {
   const s = S(size);
   const X = (v) => px + v * s;
@@ -198,6 +238,7 @@ function drawMouse(ctx, px, py, size) {
   ctx.fill();
 }
 
+// --- Золотая рыбка ---
 function drawFish(ctx, px, py, size) {
   const s = S(size);
   const X = (v) => px + v * s;
@@ -245,35 +286,34 @@ function drawFish(ctx, px, py, size) {
   ctx.stroke();
 }
 
-// ========================
-// Поле
-// ========================
+// --- Сетка и поле ---
 function drawGrid() {
   ctx.fillStyle = '#1a1024';
   ctx.fillRect(0, 0, W, W);
 
   ctx.strokeStyle = 'rgba(255, 183, 224, 0.05)';
   ctx.lineWidth = 1;
-  for (let i = 0; i <= GRID; i++) {
+  for (let i = 0; i <= CONFIG.GRID; i++) {
     ctx.beginPath();
-    ctx.moveTo(i * CELL, 0);
-    ctx.lineTo(i * CELL, W);
+    ctx.moveTo(i * CONFIG.CELL, 0);
+    ctx.lineTo(i * CONFIG.CELL, W);
     ctx.stroke();
     ctx.beginPath();
-    ctx.moveTo(0, i * CELL);
-    ctx.lineTo(W, i * CELL);
+    ctx.moveTo(0, i * CONFIG.CELL);
+    ctx.lineTo(W, i * CONFIG.CELL);
     ctx.stroke();
   }
 }
 
+// --- Главный draw ---
 function draw() {
   drawGrid();
 
-  // Еда
-  if (food) {
-    const px = food.x * CELL;
-    const py = food.y * CELL;
-
+  // Еда (пульсация)
+  if (state.food) {
+    const { CELL } = CONFIG;
+    const px = state.food.x * CELL;
+    const py = state.food.y * CELL;
     const t = performance.now() / 300;
     const scale = 1 + Math.sin(t) * 0.05;
     const offset = (CELL - CELL * scale) / 2;
@@ -281,29 +321,29 @@ function draw() {
     ctx.save();
     ctx.translate(px + offset, py + offset);
     ctx.scale(scale, scale);
-    if (food.type === 'fish') drawFish(ctx, 0, 0, CELL);
+    if (state.food.type === 'fish') drawFish(ctx, 0, 0, CELL);
     else drawMouse(ctx, 0, 0, CELL);
     ctx.restore();
   }
 
-  // Тело
-  for (let i = snake.length - 1; i >= 0; i--) {
-    const seg = snake[i];
-    const px = seg.x * CELL;
-    const py = seg.y * CELL;
+  // Змейка (от хвоста к голове)
+  for (let i = state.snake.length - 1; i >= 0; i--) {
+    const seg = state.snake[i];
+    const px = seg.x * CONFIG.CELL;
+    const py = seg.y * CONFIG.CELL;
 
     if (i === 0) {
-      drawCatFace(ctx, px, py, CELL, {
+      drawCatFace(ctx, px, py, CONFIG.CELL, {
         color: '#ff8fc8',
         face: '#ffe3f1',
-        pupilDX: direction.x,
-        pupilDY: direction.y,
+        pupilDX: state.direction.x,
+        pupilDY: state.direction.y,
         closed: false,
       });
     } else {
-      const t = i / Math.max(1, snake.length - 1);
+      const t = i / Math.max(1, state.snake.length - 1);
       const hue = 330 - t * 60;
-      drawCatFace(ctx, px, py, CELL, {
+      drawCatFace(ctx, px, py, CONFIG.CELL, {
         color: `hsl(${hue}, 80%, 72%)`,
         face: `hsl(${hue}, 90%, 92%)`,
         closed: true,
@@ -311,45 +351,54 @@ function draw() {
     }
   }
 
-  if (eatFlash > 0) {
-    ctx.fillStyle = `rgba(255, 200, 240, ${eatFlash * 0.4})`;
+  // Вспышка при поедании
+  if (state.eatFlash > 0) {
+    ctx.fillStyle = `rgba(255, 200, 240, ${state.eatFlash * 0.4})`;
     ctx.fillRect(0, 0, W, W);
   }
 }
 
-// ========================
-// Логика
-// ========================
+// ---------------------------------------------------------------------
+// LOGIC — игровая логика
+// ---------------------------------------------------------------------
 function spawnFood() {
-  const occupied = new Set(snake.map(s => s.x + ',' + s.y));
+  const occupied = new Set(state.snake.map(s => s.x + ',' + s.y));
   const free = [];
-  for (let y = 0; y < GRID; y++) {
-    for (let x = 0; x < GRID; x++) {
+  for (let y = 0; y < CONFIG.GRID; y++) {
+    for (let x = 0; x < CONFIG.GRID; x++) {
       if (!occupied.has(x + ',' + y)) free.push({ x, y });
     }
   }
   if (free.length === 0) return;
+
   const spot = free[Math.floor(Math.random() * free.length)];
 
-  const type = (foodCount > 0 && foodCount % 5 === 0) ? 'fish' : 'mouse';
-  food = { x: spot.x, y: spot.y, type };
+  // Рыбка: либо каждые N мышей, либо случайный шанс
+  const forcedFish = state.foodCount > 0 && state.foodCount % CONFIG.FISH_EVERY === 0;
+  const randomFish = Math.random() < CONFIG.FISH_CHANCE;
+  const type = (forcedFish || randomFish) ? 'fish' : 'mouse';
+
+  state.food = { x: spot.x, y: spot.y, type };
 }
 
 function eatFood() {
-  const points = food.type === 'fish' ? 3 : 1;
-  score += points;
-  foodCount++;
-  eatFlash = 1;
+  const points = state.food.type === 'fish' ? CONFIG.POINTS_FISH : CONFIG.POINTS_MOUSE;
+  state.score += points;
+  state.foodCount++;
+  state.eatFlash = 1;
 
-  const newLevel = Math.floor(foodCount / 5) + 1;
-  if (newLevel !== level) {
-    level = newLevel;
-    stepInterval = Math.max(70, 160 - (level - 1) * 10);
+  const newLevel = Math.floor(state.foodCount / CONFIG.FOOD_PER_LEVEL) + 1;
+  if (newLevel !== state.level) {
+    state.level = newLevel;
+    state.stepInterval = Math.max(
+      CONFIG.STEP_MIN,
+      CONFIG.STEP_START - (state.level - 1) * CONFIG.STEP_STEP
+    );
   }
 
-  if (score > best) {
-    best = score;
-    localStorage.setItem('catSnakeBest', best);
+  if (state.score > state.best) {
+    state.best = state.score;
+    localStorage.setItem(CONFIG.LS_BEST, state.best);
   }
 
   spawnFood();
@@ -357,154 +406,153 @@ function eatFood() {
 }
 
 function updateHUD() {
-  scoreEl.textContent = score;
-  bestEl.textContent = best;
-  lengthEl.textContent = snake.length;
-  levelEl.textContent = level;
+  scoreEl.textContent  = state.score;
+  bestEl.textContent   = state.best;
+  lengthEl.textContent = state.snake.length;
+  levelEl.textContent  = state.level;
 }
 
 function tick() {
-  direction = nextDirection;
+  state.direction = state.nextDirection;
 
   const head = {
-    x: snake[0].x + direction.x,
-    y: snake[0].y + direction.y,
+    x: state.snake[0].x + state.direction.x,
+    y: state.snake[0].y + state.direction.y,
   };
 
-  if (head.x < 0 || head.x >= GRID || head.y < 0 || head.y >= GRID) {
+  // Стена
+  if (head.x < 0 || head.x >= CONFIG.GRID || head.y < 0 || head.y >= CONFIG.GRID) {
     gameOver();
     return;
   }
 
-  const growing = food && head.x === food.x && head.y === food.y;
-  const checkLen = growing ? snake.length : snake.length - 1;
+  // Столкновение с собой (хвост не считается, если не растём)
+  const growing = state.food && head.x === state.food.x && head.y === state.food.y;
+  const checkLen = growing ? state.snake.length : state.snake.length - 1;
   for (let i = 0; i < checkLen; i++) {
-    if (snake[i].x === head.x && snake[i].y === head.y) {
+    if (state.snake[i].x === head.x && state.snake[i].y === head.y) {
       gameOver();
       return;
     }
   }
 
-  snake.unshift(head);
-
+  state.snake.unshift(head);
   if (growing) eatFood();
-  else snake.pop();
+  else state.snake.pop();
 }
 
-// ========================
-// Игровой цикл
-// ========================
+// ---------------------------------------------------------------------
+// LOOP — игровой цикл
+// ---------------------------------------------------------------------
 function loop(time = 0) {
-  if (!isRunning) return;
+  if (!state.isRunning) return;
 
-  if (!isPaused) {
-    if (!lastTime) lastTime = time;
-    const delta = time - lastTime;
-    lastTime = time;
+  if (!state.isPaused) {
+    if (!state.lastTime) state.lastTime = time;
+    const delta = time - state.lastTime;
+    state.lastTime = time;
 
-    stepCounter += delta;
-    while (stepCounter >= stepInterval) {
-      stepCounter -= stepInterval;
+    state.stepCounter += delta;
+    while (state.stepCounter >= state.stepInterval) {
+      state.stepCounter -= state.stepInterval;
       tick();
-      if (!isRunning) return;
+      if (!state.isRunning) return;
     }
 
-    if (eatFlash > 0) eatFlash = Math.max(0, eatFlash - delta / 200);
+    if (state.eatFlash > 0) state.eatFlash = Math.max(0, state.eatFlash - delta / 200);
 
     draw();
   }
 
-  animId = requestAnimationFrame(loop);
+  state.animId = requestAnimationFrame(loop);
 }
 
+// ---------------------------------------------------------------------
+// GAME CONTROL
+// ---------------------------------------------------------------------
 function startGame() {
-  snake = [
+  state.snake = [
     { x: 8, y: 10 },
     { x: 7, y: 10 },
     { x: 6, y: 10 },
   ];
-  direction = { x: 1, y: 0 };
-  nextDirection = { x: 1, y: 0 };
-  score = 0;
-  foodCount = 0;
-  level = 1;
-  stepInterval = 160;
-  stepCounter = 0;
-  lastTime = 0;
-  eatFlash = 0;
-  isRunning = true;
-  isPaused = false;
+  state.direction = { x: 1, y: 0 };
+  state.nextDirection = { x: 1, y: 0 };
+  state.score = 0;
+  state.foodCount = 0;
+  state.level = 1;
+  state.stepInterval = CONFIG.STEP_START;
+  state.stepCounter = 0;
+  state.lastTime = 0;
+  state.eatFlash = 0;
+  state.isRunning = true;
+  state.isPaused = false;
 
   spawnFood();
   updateHUD();
   overlay.classList.add('hidden');
 
-  if (animId) cancelAnimationFrame(animId);
-  animId = requestAnimationFrame(loop);
+  if (state.animId) cancelAnimationFrame(state.animId);
+  state.animId = requestAnimationFrame(loop);
 }
 
 function gameOver() {
-  isRunning = false;
-  if (animId) cancelAnimationFrame(animId);
+  state.isRunning = false;
+  if (state.animId) cancelAnimationFrame(state.animId);
   overlayTitle.textContent = '😿 Игра окончена';
-  overlayText.innerHTML = `Очки: <b>${score}</b><br>Длина: <b>${snake.length}</b><br>Рекорд: <b>${best}</b>`;
+  overlayText.innerHTML = `Очки: <b>${state.score}</b><br>Длина: <b>${state.snake.length}</b><br>Рекорд: <b>${state.best}</b>`;
   startBtn.textContent = 'Заново';
   overlay.classList.remove('hidden');
 }
 
 function togglePause() {
-  if (!isRunning) return;
-  isPaused = !isPaused;
-  if (isPaused) {
+  if (!state.isRunning) return;
+  state.isPaused = !state.isPaused;
+  if (state.isPaused) {
     overlayTitle.textContent = '😴 Пауза';
     overlayText.textContent = 'Свайп или Space — продолжить';
     startBtn.textContent = 'Продолжить';
     overlay.classList.remove('hidden');
   } else {
     overlay.classList.add('hidden');
-    lastTime = performance.now();
+    state.lastTime = performance.now();
   }
 }
 
-// ========================
-// 🎯 Управление — клавиатура
-// ========================
+// ---------------------------------------------------------------------
+// INPUT — клавиатура
+// ---------------------------------------------------------------------
 function tryDir(x, y) {
-  if (direction.x + x === 0 && direction.y + y === 0) return;
-  nextDirection = { x, y };
+  if (state.direction.x + x === 0 && state.direction.y + y === 0) return;
+  state.nextDirection = { x, y };
 }
 
 document.addEventListener('keydown', (e) => {
   if (e.key === ' ' || e.code === 'Space') {
     e.preventDefault();
-    if (!isRunning) startGame();
+    if (!state.isRunning) startGame();
     else togglePause();
     return;
   }
-
-  if (!isRunning || isPaused) return;
+  if (!state.isRunning || state.isPaused) return;
 
   switch (e.key) {
-    case 'ArrowUp': case 'w': case 'W':    tryDir(0, -1); break;
-    case 'ArrowDown': case 's': case 'S':  tryDir(0, 1);  break;
-    case 'ArrowLeft': case 'a': case 'A':  tryDir(-1, 0); break;
+    case 'ArrowUp':    case 'w': case 'W': tryDir(0, -1); break;
+    case 'ArrowDown':  case 's': case 'S': tryDir(0, 1);  break;
+    case 'ArrowLeft':  case 'a': case 'A': tryDir(-1, 0); break;
     case 'ArrowRight': case 'd': case 'D': tryDir(1, 0);  break;
   }
 });
-// ========================
-// 📱 Управление — свайпы
-// ========================
 
-const SWIPE_THRESHOLD = 24;       // минимальная длина свайпа в px
-const TAP_MAX_MOVE = 14;          // движение меньше — это тап
-const TAP_MAX_TIME = 280;         // длительность тапа в ms
-
+// ---------------------------------------------------------------------
+// INPUT — свайпы
+// ---------------------------------------------------------------------
 let touchStart = null;
 
 function onTouchStart(e) {
   if (e.touches.length !== 1) return;
 
-  // Тапы по кнопкам и ссылкам не перехватываем — пусть браузер сам обработает
+  // Тапы по кнопкам — не перехватываем
   if (e.target.closest('button, a')) return;
 
   const t = e.touches[0];
@@ -525,13 +573,10 @@ function onTouchMove(e) {
   const absX = Math.abs(dx);
   const absY = Math.abs(dy);
 
-  if (Math.max(absX, absY) < SWIPE_THRESHOLD) return;
+  if (Math.max(absX, absY) < CONFIG.SWIPE_THRESHOLD) return;
 
-  if (absX > absY) {
-    tryDir(dx > 0 ? 1 : -1, 0);
-  } else {
-    tryDir(0, dy > 0 ? 1 : -1);
-  }
+  if (absX > absY) tryDir(dx > 0 ? 1 : -1, 0);
+  else             tryDir(0, dy > 0 ? 1 : -1);
 
   touchStart.handled = true;
 }
@@ -545,9 +590,9 @@ function onTouchEnd(e) {
   const dy = touch ? touch.clientY - touchStart.y : 0;
   const moved = Math.max(Math.abs(dx), Math.abs(dy));
 
-  // Короткий тап — пауза (только если игра запущена)
-  if (!touchStart.handled && moved < TAP_MAX_MOVE && duration < TAP_MAX_TIME) {
-    if (isRunning) togglePause();
+  // Короткий тап — пауза
+  if (!touchStart.handled && moved < CONFIG.TAP_MAX_MOVE && duration < CONFIG.TAP_MAX_TIME) {
+    if (state.isRunning) togglePause();
   }
 
   touchStart = null;
@@ -561,7 +606,6 @@ document.addEventListener('touchstart', onTouchStart, { passive: true });
 document.addEventListener('touchend', onTouchEnd, { passive: true });
 document.addEventListener('touchcancel', onTouchCancel, { passive: true });
 
-// Блокируем скролл во время свайпа (только когда палец уже на экране)
 document.addEventListener('touchmove', (e) => {
   if (touchStart) {
     e.preventDefault();
@@ -569,24 +613,23 @@ document.addEventListener('touchmove', (e) => {
   }
 }, { passive: false });
 
-// Запрещаем контекстное меню на игровом поле (долгий тап)
 boardWrapper.addEventListener('contextmenu', (e) => e.preventDefault());
 
-// ========================
-// 🎯 Кнопка старта — работает и мышкой, и пальцем
-// ========================
+// ---------------------------------------------------------------------
+// BUTTONS
+// ---------------------------------------------------------------------
 function handleStartBtn(e) {
   e.preventDefault();
   e.stopPropagation();
-  if (isRunning && isPaused) togglePause();
+  if (state.isRunning && state.isPaused) togglePause();
   else startGame();
 }
 
 startBtn.addEventListener('click', handleStartBtn);
 startBtn.addEventListener('touchend', handleStartBtn, { passive: false });
 
-// ========================
-// Init
-// ========================
-bestEl.textContent = best;
+// ---------------------------------------------------------------------
+// INIT
+// ---------------------------------------------------------------------
+bestEl.textContent = state.best;
 drawGrid();

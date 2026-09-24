@@ -18,7 +18,7 @@ body {
   user-select: none;
   -webkit-user-select: none;
   -webkit-tap-highlight-color: transparent;
-  overflow: hidden;
+  overflow-x: hidden;
 }
 
 .game-wrapper {
@@ -124,6 +124,7 @@ h1 {
   border-radius: 12px;
   backdrop-filter: blur(4px);
   transition: opacity 0.3s;
+  z-index: 5;
 }
 
 .overlay.hidden {
@@ -134,6 +135,8 @@ h1 {
 .overlay-content {
   text-align: center;
   padding: 20px;
+  position: relative;
+  z-index: 6;
 }
 
 .overlay-content h2 {
@@ -161,6 +164,10 @@ h1 {
   transition: transform 0.15s, box-shadow 0.15s;
   box-shadow: 0 4px 20px rgba(255, 143, 200, 0.4);
   touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  position: relative;
+  z-index: 10;
+  user-select: none;
 }
 
 #start-btn:hover {
