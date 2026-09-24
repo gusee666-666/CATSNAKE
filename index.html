@@ -2,7 +2,9 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
   <title>🐱 Cat Snake</title>
   <link rel="stylesheet" href="style.css">
 </head>
@@ -42,12 +44,13 @@
       </div>
 
       <div class="controls-hint">
-        <p>← ↑ ↓ → или WASD</p>
-        <p>Space — пауза</p>
+        <p class="hint-desktop">← ↑ ↓ → или WASD</p>
+        <p class="hint-mobile">Свайп — поворот</p>
+        <p>Тап / Space — пауза</p>
       </div>
     </div>
 
-    <div class="board-wrapper">
+    <div class="board-wrapper" id="board-wrapper">
       <canvas id="game" width="480" height="480"></canvas>
       <div id="overlay" class="overlay">
         <div class="overlay-content">

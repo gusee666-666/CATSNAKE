@@ -1,5 +1,5 @@
 // ========================
-// 🐱 Cat Snake
+// 🐱 Cat Snake — со свайпами
 // ========================
 
 const CELL = 24;
@@ -8,6 +8,7 @@ const W = CELL * GRID;
 
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
+const boardWrapper = document.getElementById('board-wrapper');
 
 const scoreEl = document.getElementById('score');
 const bestEl = document.getElementById('best');
@@ -27,23 +28,19 @@ let score = 0;
 let best = +(localStorage.getItem('catSnakeBest') || 0);
 let foodCount = 0;
 let level = 1;
-let stepInterval = 160;   // мс на шаг
+let stepInterval = 160;
 let stepCounter = 0;
 let lastTime = 0;
 let isRunning = false;
 let isPaused = false;
 let animId = null;
-let eatFlash = 0;         // анимация поедания
-
-// Палитра для тела змейки — плавный переход по длине
-const BODY_HUES = [330, 315, 300, 285, 270]; // розовый → фиолетовый
+let eatFlash = 0;
 
 // ========================
 // 🎨 Хелперы рисования
 // ========================
-const S = (size) => size / 32; // дизайн в 32px, масштабируется
+const S = (size) => size / 32;
 
-// Морда кота. options: { pupilDX, pupilDY, closed, color, face }
 function drawCatFace(ctx, px, py, size, opts) {
   const { color, face, pupilDX = 0, pupilDY = 0, closed = false } = opts;
   const s = S(size);
@@ -86,7 +83,6 @@ function drawCatFace(ctx, px, py, size, opts) {
   ctx.arc(X(16), Y(18), 11 * s, 0, Math.PI * 2);
   ctx.fill();
 
-  // Контур
   ctx.strokeStyle = 'rgba(0,0,0,0.15)';
   ctx.lineWidth = 1;
   ctx.stroke();
@@ -104,7 +100,6 @@ function drawCatFace(ctx, px, py, size, opts) {
   const eyeR = 1.8 * s;
 
   if (closed) {
-    // зажмуренные глазки ^ ^
     ctx.beginPath();
     ctx.moveTo(X(leftX - 2), Y(eyeY + 1));
     ctx.lineTo(X(leftX), Y(eyeY - 1.5));
@@ -116,7 +111,6 @@ function drawCatFace(ctx, px, py, size, opts) {
     ctx.lineTo(X(rightX + 2), Y(eyeY + 1));
     ctx.stroke();
   } else {
-    // открытые глаза, зрачок смещён в сторону движения
     const offsetX = pupilDX * 0.9;
     const offsetY = pupilDY * 0.9;
 
@@ -127,7 +121,6 @@ function drawCatFace(ctx, px, py, size, opts) {
     ctx.arc(X(rightX), Y(eyeY), eyeR, 0, Math.PI * 2);
     ctx.fill();
 
-    // блики
     ctx.fillStyle = '#fff';
     ctx.beginPath();
     ctx.arc(X(leftX - 0.7 + offsetX), Y(eyeY - 0.7 + offsetY), eyeR * 0.5, 0, Math.PI * 2);
@@ -157,13 +150,11 @@ function drawCatFace(ctx, px, py, size, opts) {
   ctx.stroke();
 }
 
-// Мышь
 function drawMouse(ctx, px, py, size) {
   const s = S(size);
   const X = (v) => px + v * s;
   const Y = (v) => py + v * s;
 
-  // Хвостик
   ctx.strokeStyle = '#9b8ba3';
   ctx.lineWidth = 1.4 * s;
   ctx.lineCap = 'round';
@@ -172,7 +163,6 @@ function drawMouse(ctx, px, py, size) {
   ctx.quadraticCurveTo(X(30), Y(24), X(29), Y(30));
   ctx.stroke();
 
-  // Ушки
   ctx.fillStyle = '#9b8ba3';
   ctx.beginPath();
   ctx.arc(X(11), Y(11), 4.5 * s, 0, Math.PI * 2);
@@ -181,7 +171,6 @@ function drawMouse(ctx, px, py, size) {
   ctx.arc(X(21), Y(11), 4.5 * s, 0, Math.PI * 2);
   ctx.fill();
 
-  // Внутренние ушки
   ctx.fillStyle = '#ff9bb5';
   ctx.beginPath();
   ctx.arc(X(11), Y(11), 2.4 * s, 0, Math.PI * 2);
@@ -190,13 +179,11 @@ function drawMouse(ctx, px, py, size) {
   ctx.arc(X(21), Y(11), 2.4 * s, 0, Math.PI * 2);
   ctx.fill();
 
-  // Тело
   ctx.fillStyle = '#b6a8bd';
   ctx.beginPath();
   ctx.ellipse(X(16), Y(20), 9 * s, 8 * s, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  // Глазки
   ctx.fillStyle = '#2a1a33';
   ctx.beginPath();
   ctx.arc(X(13), Y(18), 1.3 * s, 0, Math.PI * 2);
@@ -205,25 +192,21 @@ function drawMouse(ctx, px, py, size) {
   ctx.arc(X(19), Y(18), 1.3 * s, 0, Math.PI * 2);
   ctx.fill();
 
-  // Носик
   ctx.fillStyle = '#ff7a95';
   ctx.beginPath();
   ctx.arc(X(16), Y(22.5), 1.5 * s, 0, Math.PI * 2);
   ctx.fill();
 }
 
-// Золотая рыбка
 function drawFish(ctx, px, py, size) {
   const s = S(size);
   const X = (v) => px + v * s;
   const Y = (v) => py + v * s;
 
-  // Свечение
   ctx.save();
   ctx.shadowColor = '#ffcc4d';
   ctx.shadowBlur = 10 * s;
 
-  // Хвост
   ctx.fillStyle = '#ffa72e';
   ctx.beginPath();
   ctx.moveTo(X(24), Y(16));
@@ -232,14 +215,12 @@ function drawFish(ctx, px, py, size) {
   ctx.closePath();
   ctx.fill();
 
-  // Тело
   ctx.fillStyle = '#ffc247';
   ctx.beginPath();
   ctx.ellipse(X(14), Y(16), 10 * s, 7 * s, 0, 0, Math.PI * 2);
   ctx.fill();
   ctx.restore();
 
-  // Полоски
   ctx.fillStyle = '#ff9f1c';
   ctx.beginPath();
   ctx.ellipse(X(13), Y(16), 2 * s, 6 * s, 0, 0, Math.PI * 2);
@@ -248,7 +229,6 @@ function drawFish(ctx, px, py, size) {
   ctx.ellipse(X(18), Y(16), 1.5 * s, 5 * s, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  // Глаз
   ctx.fillStyle = '#fff';
   ctx.beginPath();
   ctx.arc(X(9.5), Y(14), 2.4 * s, 0, Math.PI * 2);
@@ -258,7 +238,6 @@ function drawFish(ctx, px, py, size) {
   ctx.arc(X(9.5), Y(14), 1.2 * s, 0, Math.PI * 2);
   ctx.fill();
 
-  // Ротик
   ctx.strokeStyle = '#a86b00';
   ctx.lineWidth = 1 * s;
   ctx.beginPath();
@@ -287,9 +266,6 @@ function drawGrid() {
   }
 }
 
-// ========================
-// Отрисовка сцены
-// ========================
 function draw() {
   drawGrid();
 
@@ -298,7 +274,6 @@ function draw() {
     const px = food.x * CELL;
     const py = food.y * CELL;
 
-    // пульсация
     const t = performance.now() / 300;
     const scale = 1 + Math.sin(t) * 0.05;
     const offset = (CELL - CELL * scale) / 2;
@@ -311,14 +286,13 @@ function draw() {
     ctx.restore();
   }
 
-  // Тело змейки (от хвоста к голове)
+  // Тело
   for (let i = snake.length - 1; i >= 0; i--) {
     const seg = snake[i];
     const px = seg.x * CELL;
     const py = seg.y * CELL;
 
     if (i === 0) {
-      // голова — открытые глаза, зрачки смотрят в сторону движения
       drawCatFace(ctx, px, py, CELL, {
         color: '#ff8fc8',
         face: '#ffe3f1',
@@ -327,9 +301,8 @@ function draw() {
         closed: false,
       });
     } else {
-      // тело — зажмуренные глазки, цвет плавно меняется к хвосту
       const t = i / Math.max(1, snake.length - 1);
-      const hue = 330 - t * 60; // 330 → 270
+      const hue = 330 - t * 60;
       drawCatFace(ctx, px, py, CELL, {
         color: `hsl(${hue}, 80%, 72%)`,
         face: `hsl(${hue}, 90%, 92%)`,
@@ -338,7 +311,6 @@ function draw() {
     }
   }
 
-  // Вспышка при поедании
   if (eatFlash > 0) {
     ctx.fillStyle = `rgba(255, 200, 240, ${eatFlash * 0.4})`;
     ctx.fillRect(0, 0, W, W);
@@ -356,10 +328,9 @@ function spawnFood() {
       if (!occupied.has(x + ',' + y)) free.push({ x, y });
     }
   }
-  if (free.length === 0) return; // победа!
+  if (free.length === 0) return;
   const spot = free[Math.floor(Math.random() * free.length)];
 
-  // каждая 5-я еда — золотая рыбка
   const type = (foodCount > 0 && foodCount % 5 === 0) ? 'fish' : 'mouse';
   food = { x: spot.x, y: spot.y, type };
 }
@@ -370,7 +341,6 @@ function eatFood() {
   foodCount++;
   eatFlash = 1;
 
-  // уровень каждые 5 съеденных
   const newLevel = Math.floor(foodCount / 5) + 1;
   if (newLevel !== level) {
     level = newLevel;
@@ -401,13 +371,11 @@ function tick() {
     y: snake[0].y + direction.y,
   };
 
-  // стена
   if (head.x < 0 || head.x >= GRID || head.y < 0 || head.y >= GRID) {
     gameOver();
     return;
   }
 
-  // столкновение с собой (хвост сдвинется, если не едим)
   const growing = food && head.x === food.x && head.y === food.y;
   const checkLen = growing ? snake.length : snake.length - 1;
   for (let i = 0; i < checkLen; i++) {
@@ -419,11 +387,8 @@ function tick() {
 
   snake.unshift(head);
 
-  if (growing) {
-    eatFood();
-  } else {
-    snake.pop();
-  }
+  if (growing) eatFood();
+  else snake.pop();
 }
 
 // ========================
@@ -492,7 +457,7 @@ function togglePause() {
   isPaused = !isPaused;
   if (isPaused) {
     overlayTitle.textContent = '😴 Пауза';
-    overlayText.textContent = 'Нажми Space чтобы продолжить';
+    overlayText.textContent = 'Свайп или Space — продолжить';
     startBtn.textContent = 'Продолжить';
     overlay.classList.remove('hidden');
   } else {
@@ -502,10 +467,9 @@ function togglePause() {
 }
 
 // ========================
-// Управление
+// 🎯 Управление — клавиатура
 // ========================
 function tryDir(x, y) {
-  // нельзя развернуться на 180°
   if (direction.x + x === 0 && direction.y + y === 0) return;
   nextDirection = { x, y };
 }
@@ -528,6 +492,94 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
+// ========================
+// 📱 Управление — свайпы
+// ========================
+
+const SWIPE_THRESHOLD = 24;       // минимальная длина свайпа в px
+const TAP_MAX_MOVE = 14;          // движение меньше — это тап
+const TAP_MAX_TIME = 280;         // длительность тапа в ms
+
+let touchStart = null;
+
+function onTouchStart(e) {
+  if (e.touches.length !== 1) return;
+  const t = e.touches[0];
+  touchStart = {
+    x: t.clientX,
+    y: t.clientY,
+    startTime: performance.now(),
+    handled: false,
+  };
+}
+
+function onTouchMove(e) {
+  if (!touchStart || touchStart.handled) return;
+
+  const t = e.touches[0];
+  const dx = t.clientX - touchStart.x;
+  const dy = t.clientY - touchStart.y;
+  const absX = Math.abs(dx);
+  const absY = Math.abs(dy);
+
+  if (Math.max(absX, absY) < SWIPE_THRESHOLD) return;
+
+  // Определяем доминирующую ось
+  if (absX > absY) {
+    tryDir(dx > 0 ? 1 : -1, 0);
+  } else {
+    tryDir(0, dy > 0 ? 1 : -1);
+  }
+
+  // Один свайп = один поворот до конца касания
+  touchStart.handled = true;
+}
+
+function onTouchEnd(e) {
+  if (!touchStart) return;
+
+  const duration = performance.now() - touchStart.startTime;
+  const touch = e.changedTouches[0];
+  const dx = touch ? touch.clientX - touchStart.x : 0;
+  const dy = touch ? touch.clientY - touchStart.y : 0;
+  const moved = Math.max(Math.abs(dx), Math.abs(dy));
+
+  // Короткий тап — пауза (только если игра запущена)
+  if (!touchStart.handled && moved < TAP_MAX_MOVE && duration < TAP_MAX_TIME) {
+    if (isRunning) togglePause();
+  }
+
+  touchStart = null;
+}
+
+function onTouchCancel() {
+  touchStart = null;
+}
+
+// Навешиваем на весь документ, но блокируем скролл только на игровом поле
+document.addEventListener('touchstart', onTouchStart, { passive: true });
+document.addEventListener('touchend', onTouchEnd, { passive: true });
+document.addEventListener('touchcancel', onTouchCancel, { passive: true });
+
+// preventDefault на touchmove не даёт странице скроллиться во время свайпа
+document.addEventListener('touchmove', (e) => {
+  if (touchStart) {
+    e.preventDefault();
+    onTouchMove(e);
+  }
+}, { passive: false });
+
+// Запрещаем контекстное меню по долгому тапу на игровом поле
+boardWrapper.addEventListener('contextmenu', (e) => e.preventDefault());
+
+// Свайп прямо по игровому полю — не даём выделять/скроллить
+boardWrapper.addEventListener('touchstart', (e) => {
+  if (e.touches.length === 1) e.preventDefault();
+}, { passive: false });
+
+// ========================
+// Кнопка старта
+// ========================
 startBtn.addEventListener('click', () => {
   if (isRunning && isPaused) togglePause();
   else startGame();
@@ -537,5 +589,4 @@ startBtn.addEventListener('click', () => {
 // Init
 // ========================
 bestEl.textContent = best;
-// Пустой кадр до старта
 drawGrid();
