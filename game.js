@@ -491,7 +491,6 @@ document.addEventListener('keydown', (e) => {
     case 'ArrowRight': case 'd': case 'D': tryDir(1, 0);  break;
   }
 });
-
 // ========================
 // 📱 Управление — свайпы
 // ========================
@@ -504,6 +503,10 @@ let touchStart = null;
 
 function onTouchStart(e) {
   if (e.touches.length !== 1) return;
+
+  // Тапы по кнопкам и ссылкам не перехватываем — пусть браузер сам обработает
+  if (e.target.closest('button, a')) return;
+
   const t = e.touches[0];
   touchStart = {
     x: t.clientX,
@@ -524,14 +527,12 @@ function onTouchMove(e) {
 
   if (Math.max(absX, absY) < SWIPE_THRESHOLD) return;
 
-  // Определяем доминирующую ось
   if (absX > absY) {
     tryDir(dx > 0 ? 1 : -1, 0);
   } else {
     tryDir(0, dy > 0 ? 1 : -1);
   }
 
-  // Один свайп = один поворот до конца касания
   touchStart.handled = true;
 }
 
@@ -556,12 +557,11 @@ function onTouchCancel() {
   touchStart = null;
 }
 
-// Навешиваем на весь документ, но блокируем скролл только на игровом поле
 document.addEventListener('touchstart', onTouchStart, { passive: true });
 document.addEventListener('touchend', onTouchEnd, { passive: true });
 document.addEventListener('touchcancel', onTouchCancel, { passive: true });
 
-// preventDefault на touchmove не даёт странице скроллиться во время свайпа
+// Блокируем скролл во время свайпа (только когда палец уже на экране)
 document.addEventListener('touchmove', (e) => {
   if (touchStart) {
     e.preventDefault();
@@ -569,21 +569,21 @@ document.addEventListener('touchmove', (e) => {
   }
 }, { passive: false });
 
-// Запрещаем контекстное меню по долгому тапу на игровом поле
+// Запрещаем контекстное меню на игровом поле (долгий тап)
 boardWrapper.addEventListener('contextmenu', (e) => e.preventDefault());
 
-// Свайп прямо по игровому полю — не даём выделять/скроллить
-boardWrapper.addEventListener('touchstart', (e) => {
-  if (e.touches.length === 1) e.preventDefault();
-}, { passive: false });
-
 // ========================
-// Кнопка старта
+// 🎯 Кнопка старта — работает и мышкой, и пальцем
 // ========================
-startBtn.addEventListener('click', () => {
+function handleStartBtn(e) {
+  e.preventDefault();
+  e.stopPropagation();
   if (isRunning && isPaused) togglePause();
   else startGame();
-});
+}
+
+startBtn.addEventListener('click', handleStartBtn);
+startBtn.addEventListener('touchend', handleStartBtn, { passive: false });
 
 // ========================
 // Init
