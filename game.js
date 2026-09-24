@@ -1,49 +1,43 @@
 // =====================================================================
-// 🐱 Cat Snake — Эрмитаж  |  Step 2: + зум для смартфонов
+// 🐱 Cat Snake — Эрмитаж  |  Step 3: + сюжетная заставка
 // =====================================================================
 
 // ---------------------------------------------------------------------
 // CONFIG
 // ---------------------------------------------------------------------
 const CONFIG = {
-  // Поле
   CELL: 24,
   GRID: 20,
 
-  // Скорость
   STEP_START: 160,
   STEP_MIN: 70,
   STEP_STEP: 10,
   FOOD_PER_LEVEL: 5,
 
-  // Еда
   FISH_EVERY: 5,
   POINTS_MOUSE: 1,
   POINTS_FISH: 3,
   FISH_CHANCE: 0.15,
 
-  // Управление свайпами
   SWIPE_THRESHOLD: 24,
   TAP_MAX_MOVE: 14,
   TAP_MAX_TIME: 280,
 
-  // Хранилище
   LS_BEST: 'catSnakeBest',
   LS_ZOOM: 'catSnakeZoom',
+  LS_INTRO_SEEN: 'catSnakeIntroSeen',
 
-  // Зум
   ZOOM_MIN: 0.6,
   ZOOM_MAX: 1.4,
   ZOOM_STEP: 0.15,
   ZOOM_DEFAULT: 1.0,
-  ZOOM_BASE_FACTOR: 0.7,   // базовый размер = 70% доступного
-  ZOOM_MOBILE_BP: 720,     // ширина, ниже которой включается мобильный режим
-  ZOOM_DESKTOP_SIZE: 480,  // фикс. размер канваса на ПК
-  ZOOM_SAFE_TOP: 160,      // запас под HUD сверху
-  ZOOM_SAFE_SIDE: 20,      // запас по бокам
+  ZOOM_BASE_FACTOR: 0.7,
+  ZOOM_MOBILE_BP: 720,
+  ZOOM_DESKTOP_SIZE: 480,
+  ZOOM_SAFE_TOP: 160,
+  ZOOM_SAFE_SIDE: 20,
 };
 
-// Размер поля в пикселях (логический, для отрисовки)
 const W = CONFIG.CELL * CONFIG.GRID;
 
 // ---------------------------------------------------------------------
@@ -61,11 +55,16 @@ const overlayTitle  = document.getElementById('overlay-title');
 const overlayText   = document.getElementById('overlay-text');
 const startBtn      = document.getElementById('start-btn');
 
-// Зум UI
 const zoomInBtn     = document.getElementById('zoom-in');
 const zoomOutBtn    = document.getElementById('zoom-out');
 const zoomResetBtn  = document.getElementById('zoom-reset');
 const zoomIndicator = document.getElementById('zoom-indicator');
+
+// 🆕 Интро
+const introEl       = document.getElementById('intro');
+const introStartBtn = document.getElementById('intro-start');
+const introSkipBtn  = document.getElementById('intro-skip');
+const historyBtn    = document.getElementById('history-btn');
 
 // ---------------------------------------------------------------------
 // STATE
@@ -86,11 +85,12 @@ const state = {
   isPaused: false,
   animId: null,
   eatFlash: 0,
-  zoom: 1.0, // инициализируется ниже
+  zoom: 1.0,
+  introVisible: false, // 🆕
 };
 
 // ---------------------------------------------------------------------
-// RENDER — рисование
+// RENDER
 // ---------------------------------------------------------------------
 const S = (size) => size / 32;
 
@@ -100,7 +100,6 @@ function drawCatFace(ctx, px, py, size, opts) {
   const X = (v) => px + v * s;
   const Y = (v) => py + v * s;
 
-  // Ушки
   ctx.fillStyle = color;
   ctx.beginPath();
   ctx.moveTo(X(6), Y(13));
@@ -115,7 +114,6 @@ function drawCatFace(ctx, px, py, size, opts) {
   ctx.closePath();
   ctx.fill();
 
-  // Внутренние ушки
   ctx.fillStyle = '#ff9bb5';
   ctx.beginPath();
   ctx.moveTo(X(7.3), Y(12));
@@ -130,7 +128,6 @@ function drawCatFace(ctx, px, py, size, opts) {
   ctx.closePath();
   ctx.fill();
 
-  // Голова
   ctx.fillStyle = face;
   ctx.beginPath();
   ctx.arc(X(16), Y(18), 11 * s, 0, Math.PI * 2);
@@ -140,7 +137,6 @@ function drawCatFace(ctx, px, py, size, opts) {
   ctx.lineWidth = 1;
   ctx.stroke();
 
-  // Глаза
   ctx.fillStyle = '#2a1a33';
   ctx.strokeStyle = '#2a1a33';
   ctx.lineWidth = Math.max(1, 1.6 * s);
@@ -166,14 +162,12 @@ function drawCatFace(ctx, px, py, size, opts) {
   } else {
     const offsetX = pupilDX * 0.9;
     const offsetY = pupilDY * 0.9;
-
     ctx.beginPath();
     ctx.arc(X(leftX), Y(eyeY), eyeR, 0, Math.PI * 2);
     ctx.fill();
     ctx.beginPath();
     ctx.arc(X(rightX), Y(eyeY), eyeR, 0, Math.PI * 2);
     ctx.fill();
-
     ctx.fillStyle = '#fff';
     ctx.beginPath();
     ctx.arc(X(leftX - 0.7 + offsetX), Y(eyeY - 0.7 + offsetY), eyeR * 0.5, 0, Math.PI * 2);
@@ -184,7 +178,6 @@ function drawCatFace(ctx, px, py, size, opts) {
     ctx.fillStyle = '#2a1a33';
   }
 
-  // Носик
   ctx.fillStyle = '#ff7a95';
   ctx.beginPath();
   ctx.moveTo(X(14.4), Y(20.5));
@@ -193,7 +186,6 @@ function drawCatFace(ctx, px, py, size, opts) {
   ctx.closePath();
   ctx.fill();
 
-  // Ротик
   ctx.strokeStyle = '#2a1a33';
   ctx.lineWidth = Math.max(0.8, 1 * s);
   ctx.beginPath();
@@ -532,6 +524,16 @@ function tryDir(x, y) {
 }
 
 document.addEventListener('keydown', (e) => {
+  // 🆕 Пока интро открыто — игровой ввод игнорируем
+  if (state.introVisible) {
+    if (e.key === 'Enter' || e.key === ' ' || e.code === 'Space') {
+      e.preventDefault();
+      hideIntro(true);
+      startGame();
+    }
+    return;
+  }
+
   if (e.key === ' ' || e.code === 'Space') {
     e.preventDefault();
     if (!state.isRunning) startGame();
@@ -554,6 +556,7 @@ document.addEventListener('keydown', (e) => {
 let touchStart = null;
 
 function onTouchStart(e) {
+  if (state.introVisible) return; // 🆕 интро забирает себе ввод
   if (e.touches.length !== 1) return;
   if (e.target.closest('button, a')) return;
 
@@ -617,12 +620,9 @@ document.addEventListener('touchmove', (e) => {
 boardWrapper.addEventListener('contextmenu', (e) => e.preventDefault());
 
 // ---------------------------------------------------------------------
-// ZOOM — управление масштабом для смартфонов
+// ZOOM
 // ---------------------------------------------------------------------
-
-// Доступное пространство под канвас
 function getAvailableSize() {
-  // На ПК — фиксированный
   if (window.innerWidth > CONFIG.ZOOM_MOBILE_BP) {
     return CONFIG.ZOOM_DESKTOP_SIZE;
   }
@@ -633,22 +633,18 @@ function getAvailableSize() {
   return Math.max(200, Math.min(maxW, maxH, CONFIG.ZOOM_DESKTOP_SIZE));
 }
 
-// Применить текущий zoom к канвасу
 function applyZoom() {
   if (window.innerWidth > CONFIG.ZOOM_MOBILE_BP) {
-    // На ПК — убираем inline-стили, размер из CSS = 480×480
     canvas.style.width = '';
     canvas.style.height = '';
     return;
   }
-
   const avail = getAvailableSize();
   const size = Math.round(avail * CONFIG.ZOOM_BASE_FACTOR * state.zoom);
   canvas.style.width = size + 'px';
   canvas.style.height = size + 'px';
 }
 
-// Индикатор «100%» показывается на 1.2 сек
 let zoomIndicatorTimer = null;
 function showZoomIndicator() {
   if (!zoomIndicator) return;
@@ -660,18 +656,15 @@ function showZoomIndicator() {
   }, 1200);
 }
 
-// Обновить состояние кнопок (disable на краях диапазона)
 function updateZoomButtons() {
-  if (zoomInBtn)  zoomInBtn.disabled  = state.zoom >= CONFIG.ZOOM_MAX - 1e-6;
-  if (zoomOutBtn) zoomOutBtn.disabled = state.zoom <= CONFIG.ZOOM_MIN + 1e-6;
+  if (zoomInBtn)    zoomInBtn.disabled    = state.zoom >= CONFIG.ZOOM_MAX - 1e-6;
+  if (zoomOutBtn)   zoomOutBtn.disabled   = state.zoom <= CONFIG.ZOOM_MIN + 1e-6;
   if (zoomResetBtn) zoomResetBtn.disabled = Math.abs(state.zoom - CONFIG.ZOOM_DEFAULT) < 1e-6;
 }
 
-// Установить зум (с клампом и сохранением)
 function setZoom(value, showIndicator = true) {
   const clamped = Math.max(CONFIG.ZOOM_MIN, Math.min(CONFIG.ZOOM_MAX, value));
   const rounded = Math.round(clamped * 100) / 100;
-
   if (rounded === state.zoom) return;
 
   state.zoom = rounded;
@@ -682,11 +675,10 @@ function setZoom(value, showIndicator = true) {
   if (showIndicator) showZoomIndicator();
 }
 
-function zoomIn()  { setZoom(state.zoom + CONFIG.ZOOM_STEP); }
-function zoomOut() { setZoom(state.zoom - CONFIG.ZOOM_STEP); }
+function zoomIn()    { setZoom(state.zoom + CONFIG.ZOOM_STEP); }
+function zoomOut()   { setZoom(state.zoom - CONFIG.ZOOM_STEP); }
 function zoomReset() { setZoom(CONFIG.ZOOM_DEFAULT); }
 
-// Навесить обработчики на кнопки зума
 function initZoomControls() {
   const bind = (btn, handler) => {
     if (!btn) return;
@@ -697,24 +689,70 @@ function initZoomControls() {
     };
     btn.addEventListener('click', fire);
     btn.addEventListener('touchend', fire, { passive: false });
-    // защита от двойного вызова click + touchend
-    let lastFire = 0;
-    btn.addEventListener('pointerdown', (e) => {
-      const now = performance.now();
-      if (now - lastFire < 250) { e.preventDefault(); return; }
-      lastFire = now;
-    });
   };
   bind(zoomInBtn, zoomIn);
   bind(zoomOutBtn, zoomOut);
   bind(zoomResetBtn, zoomReset);
 }
 
-// Реагируем на изменение размера окна / поворот экрана
 window.addEventListener('resize', () => { applyZoom(); });
 window.addEventListener('orientationchange', () => {
   setTimeout(applyZoom, 100);
 });
+
+// ---------------------------------------------------------------------
+// INTRO — сюжетная заставка
+// ---------------------------------------------------------------------
+function showIntro() {
+  state.introVisible = true;
+  introEl.classList.remove('hidden');
+}
+
+function hideIntro(markSeen = true) {
+  state.introVisible = false;
+  introEl.classList.add('hidden');
+  if (markSeen) {
+    try { localStorage.setItem(CONFIG.LS_INTRO_SEEN, '1'); } catch (e) {}
+  }
+}
+
+function initIntro() {
+  // Кнопка «Начать стажировку»
+  const onStart = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    hideIntro(true);
+    startGame();
+  };
+  introStartBtn.addEventListener('click', onStart);
+  introStartBtn.addEventListener('touchend', onStart, { passive: false });
+
+  // Кнопка «Пропустить» — просто закрываем интро, показываем поле
+  const onSkip = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    hideIntro(true);
+  };
+  introSkipBtn.addEventListener('click', onSkip);
+  introSkipBtn.addEventListener('touchend', onSkip, { passive: false });
+
+  // Кнопка «История» в панели — открыть интро снова
+  const onHistory = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    // если игра идёт — поставим на паузу, чтобы не отвлекала
+    if (state.isRunning && !state.isPaused) togglePause();
+    showIntro();
+  };
+  historyBtn.addEventListener('click', onHistory);
+  historyBtn.addEventListener('touchend', onHistory, { passive: false });
+
+  // Первый запуск — если интро ещё не видели, показываем
+  const introSeen = localStorage.getItem(CONFIG.LS_INTRO_SEEN) === '1';
+  if (!introSeen) {
+    showIntro();
+  }
+}
 
 // ---------------------------------------------------------------------
 // BUTTONS
@@ -733,7 +771,6 @@ startBtn.addEventListener('touchend', handleStartBtn, { passive: false });
 // INIT
 // ---------------------------------------------------------------------
 (function init() {
-  // Загружаем сохранённый зум
   const saved = parseFloat(localStorage.getItem(CONFIG.LS_ZOOM));
   if (Number.isFinite(saved)) {
     state.zoom = Math.max(CONFIG.ZOOM_MIN, Math.min(CONFIG.ZOOM_MAX, saved));
@@ -747,4 +784,6 @@ startBtn.addEventListener('touchend', handleStartBtn, { passive: false });
   applyZoom();
   updateZoomButtons();
   initZoomControls();
+
+  initIntro(); // 🆕
 })();

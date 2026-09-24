@@ -49,6 +49,8 @@
         <p class="hint-mobile">Свайп — поворот</p>
         <p>Тап / Space — пауза</p>
       </div>
+
+      <button id="history-btn" type="button" class="history-btn">ℹ️ История</button>
     </div>
 
     <div class="board-wrapper" id="board-wrapper">
@@ -70,6 +72,61 @@
     <button class="zoom-btn zoom-reset" id="zoom-reset" type="button" aria-label="Сброс масштаба">⟳</button>
   </div>
   <div class="zoom-indicator" id="zoom-indicator">100%</div>
+
+  <!-- 🆕 Сюжетная заставка -->
+  <div id="intro" class="intro hidden" role="dialog" aria-modal="true" aria-labelledby="intro-title">
+    <div class="intro-content">
+      <div class="intro-scene">
+        <div class="candle" aria-hidden="true">
+          <div class="candle-flame"></div>
+          <div class="candle-body"></div>
+        </div>
+        <svg class="intro-cat" viewBox="0 0 140 120" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <!-- Тело -->
+          <ellipse cx="70" cy="95" rx="32" ry="22" fill="#1e1228"/>
+          <!-- Хвост -->
+          <path d="M38 95 Q18 95 22 72 Q26 58 40 68"
+                stroke="#1e1228" stroke-width="7" fill="none" stroke-linecap="round"/>
+          <!-- Голова -->
+          <circle cx="70" cy="52" r="24" fill="#1e1228"/>
+          <!-- Ушки -->
+          <polygon points="50,38 46,14 64,30" fill="#1e1228"/>
+          <polygon points="90,38 94,14 76,30" fill="#1e1228"/>
+          <!-- Внутренние ушки -->
+          <polygon points="53,34 51,22 60,31" fill="#3a2447"/>
+          <polygon points="87,34 89,22 80,31" fill="#3a2447"/>
+          <!-- Глаза — светятся от свечи -->
+          <ellipse cx="61" cy="50" rx="3.5" ry="5" fill="#ffcc4d"/>
+          <ellipse cx="79" cy="50" rx="3.5" ry="5" fill="#ffcc4d"/>
+          <ellipse cx="61" cy="50" rx="1.5" ry="3" fill="#1e1228"/>
+          <ellipse cx="79" cy="50" rx="1.5" ry="3" fill="#1e1228"/>
+          <circle cx="60" cy="48" r="0.8" fill="#fff" opacity="0.9"/>
+          <circle cx="78" cy="48" r="0.8" fill="#fff" opacity="0.9"/>
+          <!-- Нос -->
+          <polygon points="68,58 72,58 70,61" fill="#ff7a95"/>
+          <!-- Усы -->
+          <line x1="45" y1="58" x2="58" y2="59" stroke="#3a2447" stroke-width="1" stroke-linecap="round"/>
+          <line x1="45" y1="62" x2="58" y2="61" stroke="#3a2447" stroke-width="1" stroke-linecap="round"/>
+          <line x1="95" y1="58" x2="82" y2="59" stroke="#3a2447" stroke-width="1" stroke-linecap="round"/>
+          <line x1="95" y1="62" x2="82" y2="61" stroke="#3a2447" stroke-width="1" stroke-linecap="round"/>
+        </svg>
+      </div>
+
+      <h2 id="intro-title" class="intro-title">Эрмитажные коты</h2>
+
+      <div class="intro-text">
+        <p><b>Зимний дворец, 1745 год.</b><br>
+          Указом императрицы Елизаветы Петровны коты были призваны охранять дворец от мышей.</p>
+        <p>С тех пор ни один грызун не прошёл мимо эрмитажных котов.</p>
+        <p>Ты — юный кот-стажёр. Пройди по залам музея, поймай как можно больше мышей и стань <b>Главным Котом Эрмитажа</b>.</p>
+      </div>
+
+      <div class="intro-buttons">
+        <button id="intro-start" type="button" class="intro-btn primary">Начать стажировку</button>
+        <button id="intro-skip"  type="button" class="intro-btn ghost">Пропустить</button>
+      </div>
+    </div>
+  </div>
 
   <script src="game.js"></script>
 </body>
