@@ -69,6 +69,18 @@ h1 {
   font-size: 13px;
 }
 
+/* 🆕 Звание */
+.hud-item.hud-rank {
+  padding-top: 6px;
+  border-top: 1px dashed rgba(255, 183, 224, 0.15);
+}
+
+.hud-item.hud-rank span:last-child {
+  color: #ffd88f;
+  font-size: 12px;
+  text-shadow: 0 0 8px rgba(255, 216, 143, 0.4);
+}
+
 .label { color: #b79fd0; }
 
 .hud-item span:last-child {
@@ -170,12 +182,20 @@ h1 {
   padding: 20px;
   position: relative;
   z-index: 6;
+  max-width: 100%;
 }
 
 .overlay-content h2 {
   color: #ffb7e0;
   margin-bottom: 12px;
   font-size: 24px;
+  line-height: 1.2;
+}
+
+/* 🆕 Экран победы */
+.overlay-content h2.victory-title {
+  color: #ffd88f;
+  text-shadow: 0 0 18px rgba(255, 216, 143, 0.6);
 }
 
 .overlay-content p {
@@ -260,6 +280,75 @@ h1 {
   color: #b79fd0;
   font-style: italic;
   margin-top: 2px;
+}
+
+/* =====================  RANK TOAST  ===================== */
+.rank-toast {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 18px 12px 14px;
+  background: linear-gradient(135deg, rgba(58, 36, 71, 0.95), rgba(35, 20, 45, 0.95));
+  border: 1px solid rgba(255, 216, 143, 0.6);
+  border-radius: 14px;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 10px 32px rgba(0, 0, 0, 0.55),
+              0 0 28px rgba(255, 216, 143, 0.35);
+  transform: translateX(120%);
+  opacity: 0;
+  pointer-events: none;
+  transition: transform 0.45s cubic-bezier(0.22, 1, 0.36, 1),
+              opacity 0.35s ease;
+  z-index: 60;
+  max-width: calc(100vw - 32px);
+}
+
+.rank-toast.show {
+  transform: translateX(0);
+  opacity: 1;
+}
+
+.rank-toast-icon {
+  font-size: 30px;
+  line-height: 1;
+  filter: drop-shadow(0 0 12px rgba(255, 216, 143, 0.7));
+  flex-shrink: 0;
+  animation: rankIconPop 0.6s ease;
+}
+
+@keyframes rankIconPop {
+  0%   { transform: scale(0.4) rotate(-20deg); }
+  60%  { transform: scale(1.15) rotate(6deg); }
+  100% { transform: scale(1) rotate(0deg); }
+}
+
+.rank-toast-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.rank-toast-title {
+  font-size: 10px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: #ffd88f;
+  font-weight: 700;
+  opacity: 0.85;
+}
+
+.rank-toast-name {
+  font-size: 15px;
+  font-weight: 700;
+  color: #ffd6f0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* =====================  ZOOM UI  ===================== */
@@ -473,7 +562,7 @@ h1 {
   .hud {
     flex-direction: row;
     flex-wrap: wrap;
-    gap: 12px;
+    gap: 10px;
     padding: 8px 12px;
     font-size: 12px;
     justify-content: center;
@@ -489,17 +578,18 @@ h1 {
 
   .hud-item span:last-child { font-size: 15px; }
 
-  .hud-item.hud-hall {
-    border-top: none;
-    padding-top: 0;
+  .hud-item.hud-hall,
+  .hud-item.hud-rank {
     flex-basis: 100%;
     border-top: 1px dashed rgba(255, 183, 224, 0.15);
     padding-top: 6px;
     flex-direction: row;
     gap: 6px;
+    justify-content: center;
   }
 
   .hud-item.hud-hall span:last-child { font-size: 13px; }
+  .hud-item.hud-rank span:last-child { font-size: 12px; }
 
   .legend { display: none; }
 
@@ -532,6 +622,24 @@ h1 {
   .hall-banner-icon { font-size: 28px; }
   .hall-banner-name { font-size: 15px; }
   .hall-banner-hint { font-size: 10px; }
+
+  /* --- Rank toast --- */
+  .rank-toast {
+    top: 10px;
+    right: 10px;
+    left: 10px;
+    padding: 10px 14px 10px 12px;
+    border-radius: 12px;
+    max-width: none;
+    gap: 10px;
+  }
+
+  .rank-toast-icon { font-size: 26px; }
+  .rank-toast-title { font-size: 9px; letter-spacing: 1.2px; }
+  .rank-toast-name { font-size: 13px; }
+
+  /* --- Overlay победы --- */
+  .overlay-content h2 { font-size: 20px; }
 
   /* --- Zoom --- */
   .zoom-controls {

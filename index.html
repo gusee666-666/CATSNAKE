@@ -35,6 +35,10 @@
           <span class="label">Зал</span>
           <span id="hall-name">Подвал</span>
         </div>
+        <div class="hud-item hud-rank">
+          <span class="label">Звание</span>
+          <span id="rank-name">🐾 Котёнок-стажёр</span>
+        </div>
       </div>
 
       <div class="legend">
@@ -60,11 +64,10 @@
     <div class="board-wrapper" id="board-wrapper">
       <canvas id="game" width="480" height="480"></canvas>
 
-      <!-- 🆕 Плашка зала -->
       <div id="hall-banner" class="hall-banner">
         <div class="hall-banner-icon" id="hall-banner-icon">🏚</div>
         <div class="hall-banner-name" id="hall-banner-name">Подвал Зимнего дворца</div>
-        <div class="hall-banner-hint" id="hall-banner-hint">Мышей больше, будь внимательнее!</div>
+        <div class="hall-banner-hint" id="hall-banner-hint">Начало стажировки</div>
       </div>
 
       <div id="overlay" class="overlay">
@@ -74,6 +77,15 @@
           <button id="start-btn" type="button">Играть</button>
         </div>
       </div>
+    </div>
+  </div>
+
+  <!-- 🆕 Плашка нового звания -->
+  <div id="rank-toast" class="rank-toast" role="status" aria-live="polite">
+    <div class="rank-toast-icon" id="rank-toast-icon">🐱</div>
+    <div class="rank-toast-text">
+      <div class="rank-toast-title">Новое звание!</div>
+      <div class="rank-toast-name" id="rank-toast-name">Младший кот</div>
     </div>
   </div>
 
