@@ -1,5 +1,5 @@
 // =====================================================================
-// 🐱 Cat Snake — Эрмитаж  |  Step 5: звания и финал
+// 🐱 Cat Snake — Эрмитаж  |  Step 6: еда, баффы, бесконечный режим
 // =====================================================================
 
 // ---------------------------------------------------------------------
@@ -13,11 +13,6 @@ const CONFIG = {
   STEP_MIN: 70,
   STEP_STEP: 10,
   FOOD_PER_LEVEL: 5,
-
-  FISH_EVERY: 5,
-  POINTS_MOUSE: 1,
-  POINTS_FISH: 3,
-  FISH_CHANCE: 0.15,
 
   SWIPE_THRESHOLD: 24,
   TAP_MAX_MOVE: 14,
@@ -42,6 +37,9 @@ const CONFIG = {
 
   RANK_TOAST_MS: 3000,
   VICTORY_MICE: 100,
+
+  // 🆕 Замедление: во сколько раз медленнее при баффе
+  SLOWMO_FACTOR: 2.5,
 };
 
 const HALLS = [
@@ -54,7 +52,6 @@ const HALLS = [
   { icon: '🌃', name: 'Крыша Эрмитажа',        short: 'Крыша',    hint: 'Финальный рубеж — ветер и Нева внизу', bg: '#0f1428', grid: 'rgba(150, 190, 255, 0.09)' },
 ];
 
-// 🆕 Звания — пороги по съеденным мышам
 const RANKS = [
   { mice: 0,   icon: '🐾', name: 'Котёнок-стажёр',       short: '🐾 Котёнок-стажёр' },
   { mice: 10,  icon: '🐱', name: 'Младший кот',          short: '🐱 Младший кот' },
@@ -62,6 +59,34 @@ const RANKS = [
   { mice: 50,  icon: '⭐', name: 'Старший кот',          short: '⭐ Старший кот' },
   { mice: 100, icon: '👑', name: 'Главный Кот Эрмитажа', short: '👑 Главный Кот' },
 ];
+
+// 🆕 Типы еды и баффов
+const FOOD_TYPES = {
+  mouse: {
+    icon: '🐭', points: 1, weight: 60, kind: 'food',
+  },
+  fish: {
+    icon: '🐟', points: 3, weight: 20, kind: 'food',
+  },
+  cheese: {
+    icon: '🧀', points: 5, weight: 8, kind: 'food',
+  },
+  valerian: {
+    icon: '🌿', points: 0, weight: 5, kind: 'buff',
+    buff: 'wallpass', duration: 10000, label: 'Сквозь стены',
+  },
+  hourglass: {
+    icon: '⏱', points: 0, weight: 4, kind: 'buff',
+    buff: 'slowmo', duration: 5000, label: 'Замедление',
+  },
+  shield: {
+    icon: '🛡', points: 0, weight: 3, kind: 'buff',
+    buff: 'selfpass', duration: 8000, label: 'Сквозь себя',
+  },
+};
+
+const FOOD_KEYS = Object.keys(FOOD_TYPES);
+const FOOD_WEIGHT_TOTAL = FOOD_KEYS.reduce((s, k) => s + FOOD_TYPES[k].weight, 0);
 
 const W = CONFIG.CELL * CONFIG.GRID;
 
@@ -76,7 +101,7 @@ const bestEl        = document.getElementById('best');
 const lengthEl      = document.getElementById('length');
 const levelEl       = document.getElementById('level');
 const hallNameEl    = document.getElementById('hall-name');
-const rankNameEl    = document.getElementById('rank-name'); // 🆕
+const rankNameEl    = document.getElementById('rank-name');
 const overlay       = document.getElementById('overlay');
 const overlayTitle  = document.getElementById('overlay-title');
 const overlayText   = document.getElementById('overlay-text');
@@ -87,10 +112,20 @@ const hallBannerIcon  = document.getElementById('hall-banner-icon');
 const hallBannerName  = document.getElementById('hall-banner-name');
 const hallBannerHint  = document.getElementById('hall-banner-hint');
 
-// 🆕 Toast звания
 const rankToast      = document.getElementById('rank-toast');
 const rankToastIcon  = document.getElementById('rank-toast-icon');
 const rankToastName  = document.getElementById('rank-toast-name');
+
+const buffChips = {
+  wallpass: document.getElementById('buff-wallpass'),
+  slowmo:   document.getElementById('buff-slowmo'),
+  selfpass: document.getElementById('buff-selfpass'),
+};
+const buffFills = {
+  wallpass: document.querySelector('[data-fill="wallpass"]'),
+  slowmo:   document.querySelector('[data-fill="slowmo"]'),
+  selfpass: document.querySelector('[data-fill="selfpass"]'),
+};
 
 const zoomInBtn     = document.getElementById('zoom-in');
 const zoomOutBtn    = document.getElementById('zoom-out');
@@ -114,7 +149,7 @@ const state = {
   best: +(localStorage.getItem(CONFIG.LS_BEST) || 0),
   foodCount: 0,
   level: 1,
-  stepInterval: CONFIG.STEP_START,
+  baseStepInterval: CONFIG.STEP_START,
   stepCounter: 0,
   lastTime: 0,
   isRunning: false,
@@ -125,10 +160,17 @@ const state = {
   introVisible: false,
   hallIndex: 0,
   prevHallIndex: 0,
+  hallCycle: 0,
   hallTransitionStart: 0,
   bannerActive: false,
-  rankIndex: 0,      // 🆕
-  victoryShown: false, // 🆕
+  rankIndex: 0,
+  victoryShown: false,
+  // 🆕 баффы — сколько ms осталось
+  buffs: {
+    wallpass: 0,
+    slowmo: 0,
+    selfpass: 0,
+  },
 };
 
 // ---------------------------------------------------------------------
@@ -164,16 +206,29 @@ function parseGridColor(str) {
   };
 }
 
+// 🆕 Эффективный интервал шага с учётом замедления
+function getEffectiveStepInterval() {
+  let base = state.baseStepInterval;
+  if (state.buffs.slowmo > 0) base = base * CONFIG.SLOWMO_FACTOR;
+  return base;
+}
+
 // ---------------------------------------------------------------------
 // RENDER
 // ---------------------------------------------------------------------
 const S = (size) => size / 32;
 
 function drawCatFace(ctx, px, py, size, opts) {
-  const { color, face, pupilDX = 0, pupilDY = 0, closed = false } = opts;
+  const { color, face, pupilDX = 0, pupilDY = 0, closed = false, glow = false } = opts;
   const s = S(size);
   const X = (v) => px + v * s;
   const Y = (v) => py + v * s;
+
+  if (glow) {
+    ctx.save();
+    ctx.shadowColor = '#ff8fc8';
+    ctx.shadowBlur = 14 * s;
+  }
 
   ctx.fillStyle = color;
   ctx.beginPath();
@@ -207,6 +262,8 @@ function drawCatFace(ctx, px, py, size, opts) {
   ctx.beginPath();
   ctx.arc(X(16), Y(18), 11 * s, 0, Math.PI * 2);
   ctx.fill();
+
+  if (glow) ctx.restore();
 
   ctx.strokeStyle = 'rgba(0,0,0,0.15)';
   ctx.lineWidth = 1;
@@ -270,6 +327,7 @@ function drawCatFace(ctx, px, py, size, opts) {
   ctx.stroke();
 }
 
+// --- Мышь ---
 function drawMouse(ctx, px, py, size) {
   const s = S(size);
   const X = (v) => px + v * s;
@@ -284,40 +342,25 @@ function drawMouse(ctx, px, py, size) {
   ctx.stroke();
 
   ctx.fillStyle = '#9b8ba3';
-  ctx.beginPath();
-  ctx.arc(X(11), Y(11), 4.5 * s, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.beginPath();
-  ctx.arc(X(21), Y(11), 4.5 * s, 0, Math.PI * 2);
-  ctx.fill();
+  ctx.beginPath(); ctx.arc(X(11), Y(11), 4.5 * s, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(X(21), Y(11), 4.5 * s, 0, Math.PI * 2); ctx.fill();
 
   ctx.fillStyle = '#ff9bb5';
-  ctx.beginPath();
-  ctx.arc(X(11), Y(11), 2.4 * s, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.beginPath();
-  ctx.arc(X(21), Y(11), 2.4 * s, 0, Math.PI * 2);
-  ctx.fill();
+  ctx.beginPath(); ctx.arc(X(11), Y(11), 2.4 * s, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(X(21), Y(11), 2.4 * s, 0, Math.PI * 2); ctx.fill();
 
   ctx.fillStyle = '#b6a8bd';
-  ctx.beginPath();
-  ctx.ellipse(X(16), Y(20), 9 * s, 8 * s, 0, 0, Math.PI * 2);
-  ctx.fill();
+  ctx.beginPath(); ctx.ellipse(X(16), Y(20), 9 * s, 8 * s, 0, 0, Math.PI * 2); ctx.fill();
 
   ctx.fillStyle = '#2a1a33';
-  ctx.beginPath();
-  ctx.arc(X(13), Y(18), 1.3 * s, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.beginPath();
-  ctx.arc(X(19), Y(18), 1.3 * s, 0, Math.PI * 2);
-  ctx.fill();
+  ctx.beginPath(); ctx.arc(X(13), Y(18), 1.3 * s, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(X(19), Y(18), 1.3 * s, 0, Math.PI * 2); ctx.fill();
 
   ctx.fillStyle = '#ff7a95';
-  ctx.beginPath();
-  ctx.arc(X(16), Y(22.5), 1.5 * s, 0, Math.PI * 2);
-  ctx.fill();
+  ctx.beginPath(); ctx.arc(X(16), Y(22.5), 1.5 * s, 0, Math.PI * 2); ctx.fill();
 }
 
+// --- Рыбка ---
 function drawFish(ctx, px, py, size) {
   const s = S(size);
   const X = (v) => px + v * s;
@@ -336,33 +379,205 @@ function drawFish(ctx, px, py, size) {
   ctx.fill();
 
   ctx.fillStyle = '#ffc247';
-  ctx.beginPath();
-  ctx.ellipse(X(14), Y(16), 10 * s, 7 * s, 0, 0, Math.PI * 2);
-  ctx.fill();
+  ctx.beginPath(); ctx.ellipse(X(14), Y(16), 10 * s, 7 * s, 0, 0, Math.PI * 2); ctx.fill();
   ctx.restore();
 
   ctx.fillStyle = '#ff9f1c';
-  ctx.beginPath();
-  ctx.ellipse(X(13), Y(16), 2 * s, 6 * s, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.beginPath();
-  ctx.ellipse(X(18), Y(16), 1.5 * s, 5 * s, 0, 0, Math.PI * 2);
-  ctx.fill();
+  ctx.beginPath(); ctx.ellipse(X(13), Y(16), 2 * s, 6 * s, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(X(18), Y(16), 1.5 * s, 5 * s, 0, 0, Math.PI * 2); ctx.fill();
 
   ctx.fillStyle = '#fff';
-  ctx.beginPath();
-  ctx.arc(X(9.5), Y(14), 2.4 * s, 0, Math.PI * 2);
-  ctx.fill();
+  ctx.beginPath(); ctx.arc(X(9.5), Y(14), 2.4 * s, 0, Math.PI * 2); ctx.fill();
   ctx.fillStyle = '#2a1a33';
-  ctx.beginPath();
-  ctx.arc(X(9.5), Y(14), 1.2 * s, 0, Math.PI * 2);
-  ctx.fill();
+  ctx.beginPath(); ctx.arc(X(9.5), Y(14), 1.2 * s, 0, Math.PI * 2); ctx.fill();
 
   ctx.strokeStyle = '#a86b00';
   ctx.lineWidth = 1 * s;
+  ctx.beginPath(); ctx.arc(X(7), Y(17), 1.4 * s, 0, Math.PI); ctx.stroke();
+}
+
+// 🆕 --- Сыр ---
+function drawCheese(ctx, px, py, size) {
+  const s = S(size);
+  const X = (v) => px + v * s;
+  const Y = (v) => py + v * s;
+
+  ctx.save();
+  ctx.shadowColor = '#ffd84a';
+  ctx.shadowBlur = 8 * s;
+
+  ctx.fillStyle = '#ffd84a';
   ctx.beginPath();
-  ctx.arc(X(7), Y(17), 1.4 * s, 0, Math.PI);
+  ctx.moveTo(X(5), Y(25));
+  ctx.lineTo(X(27), Y(25));
+  ctx.lineTo(X(27), Y(11));
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+
+  ctx.strokeStyle = '#b88a1a';
+  ctx.lineWidth = 1.2 * s;
+  ctx.beginPath();
+  ctx.moveTo(X(5), Y(25));
+  ctx.lineTo(X(27), Y(25));
+  ctx.lineTo(X(27), Y(11));
+  ctx.closePath();
   ctx.stroke();
+
+  ctx.fillStyle = '#b88a1a';
+  ctx.beginPath(); ctx.arc(X(14), Y(20), 2.2 * s, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(X(21), Y(21), 1.6 * s, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(X(22), Y(16), 2 * s, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(X(17), Y(24), 1.3 * s, 0, Math.PI * 2); ctx.fill();
+}
+
+// 🆕 --- Валериана (листик) ---
+function drawValerian(ctx, px, py, size) {
+  const s = S(size);
+  const X = (v) => px + v * s;
+  const Y = (v) => py + v * s;
+
+  ctx.save();
+  ctx.shadowColor = '#8fff9f';
+  ctx.shadowBlur = 10 * s;
+
+  // Листик
+  ctx.fillStyle = '#5fcf6e';
+  ctx.beginPath();
+  ctx.moveTo(X(16), Y(27));
+  ctx.quadraticCurveTo(X(3), Y(21), X(16), Y(5));
+  ctx.quadraticCurveTo(X(29), Y(21), X(16), Y(27));
+  ctx.fill();
+
+  // Второй листик поменьше
+  ctx.fillStyle = '#84e08e';
+  ctx.beginPath();
+  ctx.moveTo(X(16), Y(27));
+  ctx.quadraticCurveTo(X(24), Y(22), X(22), Y(11));
+  ctx.quadraticCurveTo(X(17), Y(20), X(16), Y(27));
+  ctx.fill();
+
+  ctx.restore();
+
+  // Прожилка
+  ctx.strokeStyle = '#2a7a3a';
+  ctx.lineWidth = 1 * s;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(X(16), Y(25));
+  ctx.lineTo(X(16), Y(8));
+  ctx.stroke();
+}
+
+// 🆕 --- Песочные часы ---
+function drawHourglass(ctx, px, py, size) {
+  const s = S(size);
+  const X = (v) => px + v * s;
+  const Y = (v) => py + v * s;
+
+  ctx.save();
+  ctx.shadowColor = '#b89fff';
+  ctx.shadowBlur = 8 * s;
+
+  // Крышки
+  ctx.fillStyle = '#8a5cf5';
+  ctx.fillRect(X(7), Y(5), 18 * s, 3 * s);
+  ctx.fillRect(X(7), Y(24), 18 * s, 3 * s);
+
+  // Корпус
+  ctx.fillStyle = '#b89fff';
+  ctx.beginPath();
+  ctx.moveTo(X(9), Y(8));
+  ctx.lineTo(X(23), Y(8));
+  ctx.lineTo(X(16), Y(16));
+  ctx.closePath();
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(X(9), Y(24));
+  ctx.lineTo(X(23), Y(24));
+  ctx.lineTo(X(16), Y(16));
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.restore();
+
+  // Песок сверху
+  ctx.fillStyle = '#ffd84a';
+  ctx.beginPath();
+  ctx.moveTo(X(11), Y(9));
+  ctx.lineTo(X(21), Y(9));
+  ctx.lineTo(X(16), Y(14));
+  ctx.closePath();
+  ctx.fill();
+
+  // Песок снизу
+  ctx.beginPath();
+  ctx.moveTo(X(11), Y(23));
+  ctx.lineTo(X(21), Y(23));
+  ctx.lineTo(X(16), Y(18));
+  ctx.closePath();
+  ctx.fill();
+
+  // Стрижка песка
+  ctx.strokeStyle = '#ffd84a';
+  ctx.lineWidth = 1 * s;
+  ctx.beginPath();
+  ctx.moveTo(X(16), Y(14));
+  ctx.lineTo(X(16), Y(18));
+  ctx.stroke();
+}
+
+// 🆕 --- Щит ---
+function drawShield(ctx, px, py, size) {
+  const s = S(size);
+  const X = (v) => px + v * s;
+  const Y = (v) => py + v * s;
+
+  ctx.save();
+  ctx.shadowColor = '#7fb8ff';
+  ctx.shadowBlur = 10 * s;
+
+  ctx.fillStyle = '#5b9bff';
+  ctx.beginPath();
+  ctx.moveTo(X(16), Y(4));
+  ctx.lineTo(X(27), Y(9));
+  ctx.lineTo(X(27), Y(18));
+  ctx.quadraticCurveTo(X(27), Y(25), X(16), Y(29));
+  ctx.quadraticCurveTo(X(5), Y(25), X(5), Y(18));
+  ctx.lineTo(X(5), Y(9));
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.restore();
+
+  // Крест
+  ctx.fillStyle = '#fff';
+  ctx.beginPath();
+  ctx.moveTo(X(14.5), Y(11));
+  ctx.lineTo(X(17.5), Y(11));
+  ctx.lineTo(X(17.5), Y(22));
+  ctx.lineTo(X(14.5), Y(22));
+  ctx.closePath();
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(X(10), Y(15));
+  ctx.lineTo(X(22), Y(15));
+  ctx.lineTo(X(22), Y(18));
+  ctx.lineTo(X(10), Y(18));
+  ctx.closePath();
+  ctx.fill();
+}
+
+// Диспетчер отрисовки еды
+function drawFoodItem(ctx, px, py, size, kind) {
+  switch (kind) {
+    case 'mouse':     return drawMouse(ctx, px, py, size);
+    case 'fish':      return drawFish(ctx, px, py, size);
+    case 'cheese':    return drawCheese(ctx, px, py, size);
+    case 'valerian':  return drawValerian(ctx, px, py, size);
+    case 'hourglass': return drawHourglass(ctx, px, py, size);
+    case 'shield':    return drawShield(ctx, px, py, size);
+  }
 }
 
 function getCurrentHallColors() {
@@ -406,6 +621,7 @@ function drawGrid() {
 function draw() {
   drawGrid();
 
+  // Еда (пульсация)
   if (state.food) {
     const { CELL } = CONFIG;
     const px = state.food.x * CELL;
@@ -417,11 +633,12 @@ function draw() {
     ctx.save();
     ctx.translate(px + offset, py + offset);
     ctx.scale(scale, scale);
-    if (state.food.type === 'fish') drawFish(ctx, 0, 0, CELL);
-    else drawMouse(ctx, 0, 0, CELL);
+    drawFoodItem(ctx, 0, 0, CELL, state.food.kind);
     ctx.restore();
   }
 
+  // Змейка
+  const headGlow = state.buffs.selfpass > 0 || state.buffs.wallpass > 0;
   for (let i = state.snake.length - 1; i >= 0; i--) {
     const seg = state.snake[i];
     const px = seg.x * CONFIG.CELL;
@@ -434,6 +651,7 @@ function draw() {
         pupilDX: state.direction.x,
         pupilDY: state.direction.y,
         closed: false,
+        glow: headGlow,
       });
     } else {
       const t = i / Math.max(1, state.snake.length - 1);
@@ -453,8 +671,18 @@ function draw() {
 }
 
 // ---------------------------------------------------------------------
-// LOGIC
+// LOGIC — еда
 // ---------------------------------------------------------------------
+function pickFoodKind() {
+  // Взвешенный выбор
+  let roll = Math.random() * FOOD_WEIGHT_TOTAL;
+  for (const key of FOOD_KEYS) {
+    roll -= FOOD_TYPES[key].weight;
+    if (roll <= 0) return key;
+  }
+  return 'mouse';
+}
+
 function spawnFood() {
   const occupied = new Set(state.snake.map(s => s.x + ',' + s.y));
   const free = [];
@@ -466,33 +694,117 @@ function spawnFood() {
   if (free.length === 0) return;
 
   const spot = free[Math.floor(Math.random() * free.length)];
+  const kind = pickFoodKind();
 
-  const forcedFish = state.foodCount > 0 && state.foodCount % CONFIG.FISH_EVERY === 0;
-  const randomFish = Math.random() < CONFIG.FISH_CHANCE;
-  const type = (forcedFish || randomFish) ? 'fish' : 'mouse';
-
-  state.food = { x: spot.x, y: spot.y, type };
+  state.food = { x: spot.x, y: spot.y, kind };
 }
 
+function eatFood() {
+  const def = FOOD_TYPES[state.food.kind];
+
+  // Очки
+  state.score += def.points;
+
+  // Еда (мышь/рыбка/сыр) увеличивает foodCount и растит змейку
+  // Бафф — не растит, но активирует эффект
+  if (def.kind === 'food') {
+    state.foodCount++;
+
+    const newLevel = Math.floor(state.foodCount / CONFIG.FOOD_PER_LEVEL) + 1;
+    if (newLevel !== state.level) {
+      state.level = newLevel;
+      state.baseStepInterval = Math.max(
+        CONFIG.STEP_MIN,
+        CONFIG.STEP_START - (state.level - 1) * CONFIG.STEP_STEP
+      );
+      updateHallByLevel();
+    }
+
+    updateRankByMice();
+    checkVictory();
+  } else if (def.kind === 'buff') {
+    activateBuff(def.buff, def.duration);
+  }
+
+  if (state.score > state.best) {
+    state.best = state.score;
+    localStorage.setItem(CONFIG.LS_BEST, state.best);
+  }
+
+  state.eatFlash = 1;
+  spawnFood();
+  updateHUD();
+}
+
+// ---------------------------------------------------------------------
+// LOGIC — баффы
+// ---------------------------------------------------------------------
+function activateBuff(buff, duration) {
+  // Продление, если уже активен (складываем, но не больше duration)
+  state.buffs[buff] = Math.min(state.buffs[buff] + duration, duration * 1.5);
+  updateBuffsUI();
+}
+
+function updateBuffsUI() {
+  for (const key of Object.keys(buffChips)) {
+    const chip = buffChips[key];
+    const fill = buffFills[key];
+    if (!chip) continue;
+
+    const remaining = state.buffs[key];
+    if (remaining > 0) {
+      chip.hidden = false;
+      const def = Object.values(FOOD_TYPES).find(f => f.buff === key);
+      const maxDur = def ? def.duration * 1.5 : 1;
+      const pct = Math.max(0, Math.min(100, (remaining / maxDur) * 100));
+      if (fill) fill.style.width = pct + '%';
+    } else {
+      chip.hidden = true;
+    }
+  }
+}
+
+function tickBuffs(deltaMs) {
+  let changed = false;
+  for (const key of Object.keys(state.buffs)) {
+    if (state.buffs[key] > 0) {
+      state.buffs[key] = Math.max(0, state.buffs[key] - deltaMs);
+      changed = true;
+    }
+  }
+  if (changed) updateBuffsUI();
+}
+
+// ---------------------------------------------------------------------
+// LOGIC — залы, звания
+// ---------------------------------------------------------------------
 function updateHallByLevel() {
-  const newIndex = Math.min(state.level - 1, HALLS.length - 1);
-  if (newIndex === state.hallIndex) return;
+  const cycleIndex = (state.level - 1) % HALLS.length;
+  const cycle = Math.floor((state.level - 1) / HALLS.length);
+
+  if (cycleIndex === state.hallIndex && cycle === state.hallCycle) return;
 
   state.prevHallIndex = state.hallIndex;
-  state.hallIndex = newIndex;
+  state.hallIndex = cycleIndex;
+  state.hallCycle = cycle;
   state.hallTransitionStart = performance.now();
 
-  hallNameEl.textContent = HALLS[newIndex].short;
-  showHallBanner(newIndex);
+  hallNameEl.textContent = cycle > 0
+    ? `${HALLS[cycleIndex].short} (круг ${cycle + 1})`
+    : HALLS[cycleIndex].short;
+
+  showHallBanner(cycleIndex, cycle);
 }
 
 let hallBannerTimer = null;
-function showHallBanner(index) {
+function showHallBanner(index, cycle) {
   const hall = HALLS[index];
   if (!hall) return;
 
   hallBannerIcon.textContent = hall.icon;
-  hallBannerName.textContent = hall.name;
+  hallBannerName.textContent = cycle > 0
+    ? `${hall.name} — круг ${cycle + 1}`
+    : hall.name;
   hallBannerHint.textContent = hall.hint;
 
   state.bannerActive = true;
@@ -507,7 +819,6 @@ function showHallBanner(index) {
   }, CONFIG.HALL_BANNER_MS);
 }
 
-// 🆕 Звания
 function updateRankByMice() {
   let newIndex = 0;
   for (let i = 0; i < RANKS.length; i++) {
@@ -527,7 +838,6 @@ function showRankToast(rank) {
   rankToastIcon.textContent = rank.icon;
   rankToastName.textContent = rank.name;
 
-  // Перезапуск анимации иконки
   rankToastIcon.style.animation = 'none';
   void rankToastIcon.offsetWidth;
   rankToastIcon.style.animation = '';
@@ -539,7 +849,6 @@ function showRankToast(rank) {
   }, CONFIG.RANK_TOAST_MS);
 }
 
-// 🆕 Победа
 function checkVictory() {
   if (state.victoryShown) return;
   if (state.foodCount < CONFIG.VICTORY_MICE) return;
@@ -549,84 +858,68 @@ function checkVictory() {
 }
 
 function showVictory() {
-  // Пауза + оверлей победы
-  state.isPaused = true;
-
-  overlayTitle.classList.add('victory-title');
-  overlayTitle.textContent = '👑 Победа!';
-
-  overlayText.innerHTML =
-    `Ты поймал <b>${CONFIG.VICTORY_MICE}</b> мышей и стал <b>Главным Котом Эрмитажа</b>!<br>` +
-    `Императрица довольна. 🐱👑<br><br>` +
-    `Очки: <b>${state.score}</b><br>` +
-    `Длина: <b>${state.snake.length}</b><br>` +
-    `Можешь продолжить стажировку — в бесконечном режиме.`;
-
-  startBtn.textContent = 'Продолжить стажировку';
-  overlay.classList.remove('hidden');
+  // Теперь победа НЕ блокирует игру — просто toast-уведомление
+  const t = document.createElement('div');
+  t.className = 'rank-toast show';
+  t.style.cssText = 'top: 16px; left: 16px; right: auto; border-color: rgba(255,216,143,0.75);';
+  t.innerHTML = `
+    <div class="rank-toast-icon" style="animation: rankIconPop 0.6s ease;">👑</div>
+    <div class="rank-toast-text">
+      <div class="rank-toast-title">Победа!</div>
+      <div class="rank-toast-name">Главный Кот Эрмитажа</div>
+    </div>`;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 5000);
 }
 
-function eatFood() {
-  const points = state.food.type === 'fish' ? CONFIG.POINTS_FISH : CONFIG.POINTS_MOUSE;
-  state.score += points;
-  state.foodCount++;
-  state.eatFlash = 1;
-
-  const newLevel = Math.floor(state.foodCount / CONFIG.FOOD_PER_LEVEL) + 1;
-  if (newLevel !== state.level) {
-    state.level = newLevel;
-    state.stepInterval = Math.max(
-      CONFIG.STEP_MIN,
-      CONFIG.STEP_START - (state.level - 1) * CONFIG.STEP_STEP
-    );
-    updateHallByLevel();
-  }
-
-  // 🆕 Проверяем звание и победу
-  updateRankByMice();
-  checkVictory();
-
-  if (state.score > state.best) {
-    state.best = state.score;
-    localStorage.setItem(CONFIG.LS_BEST, state.best);
-  }
-
-  spawnFood();
-  updateHUD();
-}
-
-function updateHUD() {
-  scoreEl.textContent  = state.score;
-  bestEl.textContent   = state.best;
-  lengthEl.textContent = state.snake.length;
-  levelEl.textContent  = state.level;
-}
-
+// ---------------------------------------------------------------------
+// LOGIC — основной тик
+// ---------------------------------------------------------------------
 function tick() {
   state.direction = state.nextDirection;
 
-  const head = {
+  let head = {
     x: state.snake[0].x + state.direction.x,
     y: state.snake[0].y + state.direction.y,
   };
 
-  if (head.x < 0 || head.x >= CONFIG.GRID || head.y < 0 || head.y >= CONFIG.GRID) {
-    gameOver();
-    return;
-  }
-
-  const growing = state.food && head.x === state.food.x && head.y === state.food.y;
-  const checkLen = growing ? state.snake.length : state.snake.length - 1;
-  for (let i = 0; i < checkLen; i++) {
-    if (state.snake[i].x === head.x && state.snake[i].y === head.y) {
+  // 🆕 wallpass: телепорт через края
+  if (state.buffs.wallpass > 0) {
+    if (head.x < 0) head.x = CONFIG.GRID - 1;
+    else if (head.x >= CONFIG.GRID) head.x = 0;
+    if (head.y < 0) head.y = CONFIG.GRID - 1;
+    else if (head.y >= CONFIG.GRID) head.y = 0;
+  } else {
+    if (head.x < 0 || head.x >= CONFIG.GRID || head.y < 0 || head.y >= CONFIG.GRID) {
       gameOver();
       return;
     }
   }
 
+  const isFood = state.food && head.x === state.food.x && head.y === state.food.y;
+  const foodDef = isFood ? FOOD_TYPES[state.food.kind] : null;
+  const isBuffPick = foodDef && foodDef.kind === 'buff';
+
+  // 🆕 selfpass: пропускаем проверку столкновения с собой
+  if (state.buffs.selfpass <= 0) {
+    const checkLen = isFood && !isBuffPick ? state.snake.length : state.snake.length - 1;
+    for (let i = 0; i < checkLen; i++) {
+      if (state.snake[i].x === head.x && state.snake[i].y === head.y) {
+        gameOver();
+        return;
+      }
+    }
+  }
+
   state.snake.unshift(head);
-  if (growing) eatFood();
-  else state.snake.pop();
+
+  if (isFood) {
+    eatFood();
+    // Бафф не растит, обычная еда — растит
+    if (isBuffPick) state.snake.pop();
+  } else {
+    state.snake.pop();
+  }
 }
 
 // ---------------------------------------------------------------------
@@ -640,13 +933,17 @@ function loop(time = 0) {
     const delta = time - state.lastTime;
     state.lastTime = time;
 
+    // Баффы тикают даже под плашкой зала
+    tickBuffs(delta);
+
     if (state.bannerActive) {
       if (state.eatFlash > 0) state.eatFlash = Math.max(0, state.eatFlash - delta / 200);
       draw();
     } else {
+      const interval = getEffectiveStepInterval();
       state.stepCounter += delta;
-      while (state.stepCounter >= state.stepInterval) {
-        state.stepCounter -= state.stepInterval;
+      while (state.stepCounter >= interval) {
+        state.stepCounter -= interval;
         tick();
         if (!state.isRunning) return;
       }
@@ -674,28 +971,33 @@ function startGame() {
   state.score = 0;
   state.foodCount = 0;
   state.level = 1;
-  state.stepInterval = CONFIG.STEP_START;
+  state.baseStepInterval = CONFIG.STEP_START;
   state.stepCounter = 0;
   state.lastTime = 0;
   state.eatFlash = 0;
   state.isRunning = true;
   state.isPaused = false;
   state.bannerActive = false;
-  state.rankIndex = 0;      // 🆕
-  state.victoryShown = false; // 🆕
+  state.rankIndex = 0;
+  state.victoryShown = false;
+  state.hallCycle = 0;
 
-  // Звание сброшено
+  // Сброс баффов
+  state.buffs.wallpass = 0;
+  state.buffs.slowmo = 0;
+  state.buffs.selfpass = 0;
+  updateBuffsUI();
+
   rankNameEl.textContent = RANKS[0].short;
   rankToast.classList.remove('show');
 
-  // Оверлей — обычный вид
   overlayTitle.classList.remove('victory-title');
 
   state.hallIndex = 0;
   state.prevHallIndex = 0;
   state.hallTransitionStart = performance.now();
   hallNameEl.textContent = HALLS[0].short;
-  showHallBanner(0);
+  showHallBanner(0, 0);
 
   spawnFood();
   updateHUD();
@@ -709,6 +1011,12 @@ function gameOver() {
   state.isRunning = false;
   state.bannerActive = false;
   if (state.animId) cancelAnimationFrame(state.animId);
+
+  // Останавливаем баффы
+  state.buffs.wallpass = 0;
+  state.buffs.slowmo = 0;
+  state.buffs.selfpass = 0;
+  updateBuffsUI();
 
   const hall = HALLS[state.hallIndex];
   const rank = RANKS[state.rankIndex];
@@ -725,7 +1033,7 @@ function gameOver() {
     `Очки: <b>${state.score}</b><br>` +
     `Длина: <b>${state.snake.length}</b><br>` +
     `Рекорд: <b>${state.best}</b><br>` +
-    `Зал: <b>${hall.short}</b><br>` +
+    `Зал: <b>${hall.short}${state.hallCycle > 0 ? ` (круг ${state.hallCycle + 1})` : ''}</b><br>` +
     `Звание: <b>${rank.name}</b>${extra}`;
 
   startBtn.textContent = 'Заново';
@@ -747,6 +1055,13 @@ function togglePause() {
     overlay.classList.add('hidden');
     state.lastTime = performance.now();
   }
+}
+
+function updateHUD() {
+  scoreEl.textContent  = state.score;
+  bestEl.textContent   = state.best;
+  lengthEl.textContent = state.snake.length;
+  levelEl.textContent  = state.level;
 }
 
 // ---------------------------------------------------------------------
@@ -982,15 +1297,6 @@ function initIntro() {
 function handleStartBtn(e) {
   e.preventDefault();
   e.stopPropagation();
-
-  // Если открыт оверлей победы → просто закрываем его и продолжаем
-  if (state.victoryShown && state.isPaused && state.isRunning) {
-    overlay.classList.add('hidden');
-    state.isPaused = false;
-    state.lastTime = performance.now();
-    return;
-  }
-
   if (state.isRunning && state.isPaused) togglePause();
   else startGame();
 }
@@ -1013,6 +1319,7 @@ startBtn.addEventListener('touchend', handleStartBtn, { passive: false });
   hallNameEl.textContent = HALLS[0].short;
   rankNameEl.textContent = RANKS[0].short;
   drawGrid();
+  updateBuffsUI();
 
   applyZoom();
   updateZoomButtons();

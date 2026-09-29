@@ -59,22 +59,13 @@ h1 {
   font-size: 14px;
 }
 
-.hud-item.hud-hall {
-  padding-top: 6px;
-  border-top: 1px dashed rgba(255, 183, 224, 0.15);
-}
-
-.hud-item.hud-hall span:last-child {
-  color: #ffb7e0;
-  font-size: 13px;
-}
-
-/* 🆕 Звание */
+.hud-item.hud-hall,
 .hud-item.hud-rank {
   padding-top: 6px;
   border-top: 1px dashed rgba(255, 183, 224, 0.15);
 }
 
+.hud-item.hud-hall span:last-child { color: #ffb7e0; font-size: 13px; }
 .hud-item.hud-rank span:last-child {
   color: #ffd88f;
   font-size: 12px;
@@ -88,6 +79,94 @@ h1 {
   color: #ffd6f0;
 }
 
+/* =====================  BUFFS BAR  ===================== */
+.buffs-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.buffs-bar:empty {
+  display: none;
+}
+
+.buff-chip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 10px 7px 12px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, rgba(58, 36, 71, 0.75), rgba(35, 20, 45, 0.75));
+  border: 1px solid rgba(255, 183, 224, 0.28);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3),
+              inset 0 0 12px rgba(255, 183, 224, 0.06);
+  animation: buffChipIn 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+.buff-chip[hidden] {
+  display: none;
+}
+
+@keyframes buffChipIn {
+  from { opacity: 0; transform: translateX(-14px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+.buff-chip-icon {
+  font-size: 20px;
+  line-height: 1;
+  flex-shrink: 0;
+  filter: drop-shadow(0 0 8px rgba(255, 216, 143, 0.6));
+}
+
+.buff-chip-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  flex: 1;
+}
+
+.buff-chip-name {
+  font-size: 11px;
+  font-weight: 700;
+  color: #ffd6f0;
+  letter-spacing: 0.2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.buff-chip-progress {
+  height: 4px;
+  background: rgba(0, 0, 0, 0.4);
+  border-radius: 2px;
+  overflow: hidden;
+  position: relative;
+}
+
+.buff-chip-fill {
+  height: 100%;
+  width: 100%;
+  background: linear-gradient(90deg, #ffd88f, #ff8fc8);
+  border-radius: 2px;
+  transition: width 0.08s linear;
+  box-shadow: 0 0 8px rgba(255, 183, 224, 0.5);
+}
+
+/* Идентификация чипа по цвету */
+#buff-wallpass { border-color: rgba(143, 255, 159, 0.5); }
+#buff-wallpass .buff-chip-fill { background: linear-gradient(90deg, #8fff9f, #5fcf6e); }
+
+#buff-slowmo { border-color: rgba(184, 159, 255, 0.55); }
+#buff-slowmo .buff-chip-fill { background: linear-gradient(90deg, #b89fff, #8a5cf5); }
+
+#buff-selfpass { border-color: rgba(123, 184, 255, 0.55); }
+#buff-selfpass .buff-chip-fill { background: linear-gradient(90deg, #9ec9ff, #5b9bff); }
+
+/* =====================  LEGEND  ===================== */
 .legend {
   display: flex;
   flex-direction: column;
@@ -100,6 +179,21 @@ h1 {
   color: #d9c7ec;
 }
 
+.legend-title {
+  font-size: 10px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: #8a7aa3;
+  font-weight: 700;
+  margin-bottom: 2px;
+}
+
+.legend-title-buff {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed rgba(255, 183, 224, 0.15);
+}
+
 .legend-item {
   display: flex;
   align-items: center;
@@ -109,8 +203,11 @@ h1 {
 .legend-icon {
   font-size: 18px;
   filter: drop-shadow(0 0 6px rgba(255, 183, 224, 0.5));
+  width: 22px;
+  text-align: center;
 }
 
+/* =====================  ОСТАЛЬНОЕ  ===================== */
 .controls-hint {
   font-size: 12px;
   color: #8a7aa3;
@@ -192,7 +289,6 @@ h1 {
   line-height: 1.2;
 }
 
-/* 🆕 Экран победы */
 .overlay-content h2.victory-title {
   color: #ffd88f;
   text-shadow: 0 0 18px rgba(255, 216, 143, 0.6);
@@ -591,6 +687,24 @@ h1 {
   .hud-item.hud-hall span:last-child { font-size: 13px; }
   .hud-item.hud-rank span:last-child { font-size: 12px; }
 
+  /* 🆕 Баффы — компактнее */
+  .buffs-bar {
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 6px;
+    width: 100%;
+  }
+
+  .buff-chip {
+    flex: 1 1 100px;
+    padding: 6px 8px 6px 10px;
+    gap: 8px;
+  }
+
+  .buff-chip-icon { font-size: 16px; }
+  .buff-chip-name { font-size: 10px; }
+
   .legend { display: none; }
 
   .controls-hint {
@@ -612,7 +726,6 @@ h1 {
     height: min(70vw, 70vh, 340px);
   }
 
-  /* --- Hall banner --- */
   .hall-banner {
     padding: 14px 20px;
     border-radius: 14px;
@@ -623,7 +736,6 @@ h1 {
   .hall-banner-name { font-size: 15px; }
   .hall-banner-hint { font-size: 10px; }
 
-  /* --- Rank toast --- */
   .rank-toast {
     top: 10px;
     right: 10px;
@@ -638,10 +750,8 @@ h1 {
   .rank-toast-title { font-size: 9px; letter-spacing: 1.2px; }
   .rank-toast-name { font-size: 13px; }
 
-  /* --- Overlay победы --- */
   .overlay-content h2 { font-size: 20px; }
 
-  /* --- Zoom --- */
   .zoom-controls {
     display: flex;
     flex-direction: column;
@@ -716,7 +826,6 @@ h1 {
 
   .zoom-indicator.show { opacity: 1; }
 
-  /* --- Intro --- */
   .intro { padding: 12px; }
   .intro-content { padding: 24px 18px; border-radius: 16px; }
   .intro-scene { height: 130px; }

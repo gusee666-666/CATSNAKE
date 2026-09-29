@@ -41,7 +41,33 @@
         </div>
       </div>
 
+      <!-- 🆕 Активные баффы -->
+      <div class="buffs-bar" id="buffs-bar">
+        <div class="buff-chip" id="buff-wallpass" hidden>
+          <span class="buff-chip-icon">🌿</span>
+          <div class="buff-chip-body">
+            <span class="buff-chip-name">Сквозь стены</span>
+            <div class="buff-chip-progress"><div class="buff-chip-fill" data-fill="wallpass"></div></div>
+          </div>
+        </div>
+        <div class="buff-chip" id="buff-slowmo" hidden>
+          <span class="buff-chip-icon">⏱</span>
+          <div class="buff-chip-body">
+            <span class="buff-chip-name">Замедление</span>
+            <div class="buff-chip-progress"><div class="buff-chip-fill" data-fill="slowmo"></div></div>
+          </div>
+        </div>
+        <div class="buff-chip" id="buff-selfpass" hidden>
+          <span class="buff-chip-icon">🛡</span>
+          <div class="buff-chip-body">
+            <span class="buff-chip-name">Сквозь себя</span>
+            <div class="buff-chip-progress"><div class="buff-chip-fill" data-fill="selfpass"></div></div>
+          </div>
+        </div>
+      </div>
+
       <div class="legend">
+        <div class="legend-title">Еда</div>
         <div class="legend-item">
           <span class="legend-icon">🐭</span>
           <span>+1 очко</span>
@@ -49,6 +75,23 @@
         <div class="legend-item">
           <span class="legend-icon">🐟</span>
           <span>+3 очка</span>
+        </div>
+        <div class="legend-item">
+          <span class="legend-icon">🧀</span>
+          <span>+5 очков</span>
+        </div>
+        <div class="legend-title legend-title-buff">Баффы</div>
+        <div class="legend-item">
+          <span class="legend-icon">🌿</span>
+          <span>Сквозь стены</span>
+        </div>
+        <div class="legend-item">
+          <span class="legend-icon">⏱</span>
+          <span>Замедление</span>
+        </div>
+        <div class="legend-item">
+          <span class="legend-icon">🛡</span>
+          <span>Сквозь себя</span>
         </div>
       </div>
 
@@ -80,7 +123,6 @@
     </div>
   </div>
 
-  <!-- 🆕 Плашка нового звания -->
   <div id="rank-toast" class="rank-toast" role="status" aria-live="polite">
     <div class="rank-toast-icon" id="rank-toast-icon">🐱</div>
     <div class="rank-toast-text">
